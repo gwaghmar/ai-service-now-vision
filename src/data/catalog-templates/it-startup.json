@@ -1,0 +1,108 @@
+{
+  "requestTypes": [
+    {
+      "slug": "saas_access",
+      "title": "SaaS application access",
+      "description": "Request access to a cloud app behind SSO.",
+      "fieldSchema": {
+        "fields": [
+          {
+            "key": "application",
+            "label": "Application",
+            "type": "text",
+            "required": true,
+            "placeholder": "e.g. Linear, Notion"
+          },
+          {
+            "key": "role",
+            "label": "Role or group",
+            "type": "text",
+            "required": true
+          },
+          {
+            "key": "reason",
+            "label": "Business reason",
+            "type": "textarea",
+            "required": true
+          }
+        ]
+      },
+      "riskDefaults": { "IAM": "Least privilege" }
+    },
+    {
+      "slug": "github_repo_access",
+      "title": "Git repository access",
+      "description": "Read or write access to a repo or package registry.",
+      "fieldSchema": {
+        "fields": [
+          {
+            "key": "repo",
+            "label": "Repository / registry",
+            "type": "text",
+            "required": true
+          },
+          {
+            "key": "access_level",
+            "label": "Access level",
+            "type": "text",
+            "required": true,
+            "placeholder": "read / triage / write / admin"
+          },
+          {
+            "key": "justification",
+            "label": "Justification",
+            "type": "textarea",
+            "required": true
+          }
+        ]
+      },
+      "riskDefaults": { "Security": "No shared accounts" }
+    },
+    {
+      "slug": "cloud_resource",
+      "title": "Cloud resource change",
+      "description": "New environment, quota increase, or networking change.",
+      "fieldSchema": {
+        "fields": [
+          {
+            "key": "cloud_scope",
+            "label": "Cloud & scope",
+            "type": "textarea",
+            "required": true
+          },
+          {
+            "key": "estimate",
+            "label": "Estimated monthly cost (if any)",
+            "type": "text",
+            "required": false,
+            "placeholder": "e.g. $120/mo"
+          }
+        ]
+      },
+      "riskDefaults": { "FinOps": "Tagging required" }
+    },
+    {
+      "slug": "security_review",
+      "title": "Security / architecture review",
+      "description": "Review before production launch or vendor integration.",
+      "fieldSchema": {
+        "fields": [
+          {
+            "key": "summary",
+            "label": "What is launching",
+            "type": "textarea",
+            "required": true
+          },
+          {
+            "key": "data_classes",
+            "label": "Data classes involved",
+            "type": "text",
+            "required": true,
+            "placeholder": "PII, payments, PHI, none"
+          }
+        ]
+      },
+      "riskDefaults": { "Review": "Security team SLA 5 business days" }
+    }
+  ]
+}

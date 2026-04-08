@@ -1,0 +1,60 @@
+{
+  "requestTypes": [
+    {
+      "slug": "clinical_data_access",
+      "title": "Clinical data access",
+      "description": "Read-only access to PHI with minimum necessary scope.",
+      "fieldSchema": {
+        "fields": [
+          {
+            "key": "system",
+            "label": "System / dataset",
+            "type": "text",
+            "required": true
+          },
+          {
+            "key": "purpose",
+            "label": "Clinical or operational purpose",
+            "type": "textarea",
+            "required": true
+          },
+          {
+            "key": "duration_days",
+            "label": "Duration (days)",
+            "type": "text",
+            "required": true
+          }
+        ]
+      },
+      "riskDefaults": { "Compliance": "HIPAA minimum necessary" }
+    },
+    {
+      "slug": "vendor_access",
+      "title": "Vendor / partner access",
+      "description": "Third-party access tied to a contract.",
+      "fieldSchema": {
+        "fields": [
+          {
+            "key": "vendor",
+            "label": "Vendor name",
+            "type": "text",
+            "required": true
+          },
+          {
+            "key": "assets",
+            "label": "Systems or data touched",
+            "type": "textarea",
+            "required": true
+          },
+          {
+            "key": "contract_ref",
+            "label": "MSA / SOW reference",
+            "type": "text",
+            "required": true
+          }
+        ]
+      },
+      "riskDefaults": { "Procurement": "Contract on file" }
+    }
+  ]
+}

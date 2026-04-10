@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 import { db } from "@/db";
 import { approval, request as requestTable } from "@/db/schema";
 import { isApproverAllowedForRequest } from "@/server/approval-routing";
@@ -11,6 +11,8 @@ import {
 import { deliverOrgWebhook } from "@/server/webhooks";
 
 export type RequestDecision = "approved" | "denied" | "needs_info";
+
+const APPROVABLE_STATUSES = ["pending_approval", "needs_info"] as const;
 
 /**
  * Apply an approval decision (shared by session action and email token API).
@@ -45,7 +47,7 @@ export async function applyRequestDecision(input: {
     .limit(1);
 
   if (!req) throw new Error("Request not found.");
-  if (req.status !== "pending_approval" && req.status !== "needs_info") {
+  if (!APPROVABLE_STATUSES.includes(req.status as (typeof APPROVABLE_STATUSES)[number])) {
     throw new Error("Request is not awaiting approval.");
   }
 
@@ -60,50 +62,74 @@ export async function applyRequestDecision(input: {
     }
   }
 
-  await db.insert(approval).values({
-    id: randomUUID(),
-    requestId: req.id,
-    approverId,
-    decision,
-    comment: comment ?? null,
-  });
+  const nextStatus =
+    decision === "approved"
+      ? "approved"
+      : decision === "denied"
+        ? "denied"
+        : "needs_info";
 
-  await recordAuditEvent({
-    organizationId: orgId,
-    actorId: approverId,
-    entityType: "request",
-    entityId: req.id,
-    action: `approval_${decision}`,
-    metadata: { comment: comment ?? undefined },
-  });
+  let jobId: string | null = null;
 
-  if (decision === "approved") {
-    await db
+  await db.transaction(async (tx) => {
+    const updated = await tx
       .update(requestTable)
-      .set({ status: "approved", updatedAt: new Date() })
-      .where(eq(requestTable.id, req.id));
+      .set({ status: nextStatus, updatedAt: new Date() })
+      .where(
+        and(
+          eq(requestTable.id, req.id),
+          eq(requestTable.organizationId, orgId),
+          or(
+            eq(requestTable.status, APPROVABLE_STATUSES[0]),
+            eq(requestTable.status, APPROVABLE_STATUSES[1]),
+          ),
+        ),
+      )
+      .returning({ id: requestTable.id });
 
-    void deliverOrgWebhook({
-      organizationId: orgId,
-      event: "request.approved",
-      data: { requestId: req.id, approverId },
-    });
+    if (updated.length === 0) {
+      throw new Error(
+        "Request is no longer awaiting approval. Please refresh before deciding.",
+      );
+    }
 
-    const jobId = await enqueueFulfillmentJob({
-      organizationId: orgId,
+    await tx.insert(approval).values({
+      id: randomUUID(),
       requestId: req.id,
-      actorId: approverId,
+      approverId,
+      decision,
+      comment: comment ?? null,
     });
-    await processFulfillmentJobById(jobId);
-  } else if (decision === "denied") {
-    await db
-      .update(requestTable)
-      .set({ status: "denied", updatedAt: new Date() })
-      .where(eq(requestTable.id, req.id));
-  } else {
-    await db
-      .update(requestTable)
-      .set({ status: "needs_info", updatedAt: new Date() })
-      .where(eq(requestTable.id, req.id));
-  }
+
+    await recordAuditEvent(
+      {
+        organizationId: orgId,
+        actorId: approverId,
+        entityType: "request",
+        entityId: req.id,
+        action: `approval_${decision}`,
+        metadata: { comment: comment ?? undefined },
+      },
+      tx,
+    );
+
+    // Enqueue fulfillment job atomically inside the TX so a crash between
+    // commit and enqueue cannot orphan an approved request without a job.
+    if (decision === "approved") {
+      jobId = await enqueueFulfillmentJob(
+        { organizationId: orgId, requestId: req.id, actorId: approverId },
+        tx,
+      );
+    }
+  });
+
+  if (decision !== "approved" || !jobId) return;
+
+  void deliverOrgWebhook({
+    organizationId: orgId,
+    event: "request.approved",
+    data: { requestId: req.id, approverId },
+  });
+
+  await processFulfillmentJobById(jobId);
 }

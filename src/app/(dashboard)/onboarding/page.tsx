@@ -1,4 +1,4 @@
-import { count, eq } from "drizzle-orm";
+import { and, count, eq, isNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import {
@@ -52,7 +52,12 @@ export default async function OnboardingPage({
   const [typeCount] = await db
     .select({ n: count() })
     .from(requestType)
-    .where(eq(requestType.organizationId, orgId));
+    .where(
+      and(
+        eq(requestType.organizationId, orgId),
+        isNull(requestType.archivedAt),
+      ),
+    );
 
   let aiConfigured = false;
   try {

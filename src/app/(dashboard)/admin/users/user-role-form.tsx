@@ -57,7 +57,13 @@ export function UserRoleForm({
       >
         Update
       </button>
-      {msg && <span className="text-xs text-zinc-600">{msg}</span>}
+      {msg && (
+        <span
+          className={`text-xs ${msg === "Saved." ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}
+        >
+          {msg}
+        </span>
+      )}
     </form>
   );
 }

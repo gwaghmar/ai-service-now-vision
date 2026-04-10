@@ -1,4 +1,4 @@
-import { and, asc, eq, or } from "drizzle-orm";
+import { and, asc, eq, isNull, or } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import {
@@ -28,7 +28,12 @@ export default async function AdminRoutingPage() {
       slug: requestType.slug,
     })
     .from(requestType)
-    .where(eq(requestType.organizationId, orgId))
+    .where(
+      and(
+        eq(requestType.organizationId, orgId),
+        isNull(requestType.archivedAt),
+      ),
+    )
     .orderBy(asc(requestType.title));
 
   const approvers = await db

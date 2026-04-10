@@ -4,6 +4,12 @@ export function requestStatusLabel(status: string): string {
       return "Waiting for approval";
     case "needs_info":
       return "Needs more info";
+    case "approved":
+      return "Approved";
+    case "denied":
+      return "Denied";
+    case "cancelled":
+      return "Cancelled";
     case "fulfilled":
       return "Done";
     case "failed":

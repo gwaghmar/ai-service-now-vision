@@ -7,13 +7,24 @@ import { runProvisionWithConnector } from "@/server/fulfillment";
 import { deliverOrgWebhook } from "@/server/webhooks";
 
 const OPEN_STATUSES = ["pending", "processing"] as const;
+const PROCESSING_STALE_AFTER_MS = 5 * 60 * 1000;
 
-export async function enqueueFulfillmentJob(input: {
-  organizationId: string;
-  requestId: string;
-  actorId: string | null;
-}): Promise<string> {
-  const [open] = await db
+type DbExecutor = { insert: typeof db.insert; select: typeof db.select };
+
+/**
+ * Enqueue a fulfillment job. Accepts an optional transaction executor so the
+ * insert can be made atomic with the approval status update — if the server
+ * crashes after the TX commits, the job row is guaranteed to exist.
+ */
+export async function enqueueFulfillmentJob(
+  input: {
+    organizationId: string;
+    requestId: string;
+    actorId: string | null;
+  },
+  executor: DbExecutor = db,
+): Promise<string> {
+  const [open] = await executor
     .select({ id: fulfillmentJob.id })
     .from(fulfillmentJob)
     .where(
@@ -27,7 +38,7 @@ export async function enqueueFulfillmentJob(input: {
   if (open) return open.id;
 
   const id = randomUUID();
-  await db.insert(fulfillmentJob).values({
+  await executor.insert(fulfillmentJob).values({
     id,
     organizationId: input.organizationId,
     requestId: input.requestId,
@@ -46,16 +57,30 @@ export async function processFulfillmentJobById(jobId: string): Promise<void> {
     .where(eq(fulfillmentJob.id, jobId))
     .limit(1);
 
-  if (!job || job.status !== "pending") return;
+  if (!job) return;
 
-  await db
+  const staleCutoff = new Date(Date.now() - PROCESSING_STALE_AFTER_MS);
+  const canRetryFailed = job.status === "failed" && job.attempts < job.maxAttempts;
+  const isStaleProcessing =
+    job.status === "processing" &&
+    job.attempts < job.maxAttempts &&
+    job.updatedAt <= staleCutoff;
+
+  if (job.status !== "pending" && !canRetryFailed && !isStaleProcessing) return;
+
+  const nextAttempts = job.attempts + 1;
+
+  const claimed = await db
     .update(fulfillmentJob)
     .set({
       status: "processing",
-      attempts: job.attempts + 1,
+      attempts: nextAttempts,
       updatedAt: new Date(),
     })
-    .where(eq(fulfillmentJob.id, jobId));
+    .where(and(eq(fulfillmentJob.id, jobId), eq(fulfillmentJob.status, job.status)))
+    .returning({ id: fulfillmentJob.id });
+
+  if (claimed.length === 0) return;
 
   try {
     await runProvisionWithConnector({
@@ -71,36 +96,43 @@ export async function processFulfillmentJobById(jobId: string): Promise<void> {
     const message =
       err instanceof Error ? err.message : "Unknown provision error";
 
-    await db
-      .update(requestTable)
-      .set({ status: "failed", updatedAt: new Date() })
-      .where(eq(requestTable.id, job.requestId));
+    const exhausted = nextAttempts >= job.maxAttempts;
+    const nextStatus = exhausted ? "failed" : "pending";
 
-    await recordAuditEvent({
-      organizationId: job.organizationId,
-      actorId: null,
-      entityType: "request",
-      entityId: job.requestId,
-      action: "provision_failed",
-      metadata: { error: message.slice(0, 500) },
-    });
+    if (exhausted) {
+      await db
+        .update(requestTable)
+        .set({ status: "failed", updatedAt: new Date() })
+        .where(eq(requestTable.id, job.requestId));
 
-    void deliverOrgWebhook({
-      organizationId: job.organizationId,
-      event: "provision.failed",
-      data: { requestId: job.requestId, error: message.slice(0, 500) },
-    });
+      await recordAuditEvent({
+        organizationId: job.organizationId,
+        actorId: null,
+        entityType: "request",
+        entityId: job.requestId,
+        action: "provision_failed",
+        metadata: { error: message.slice(0, 500) },
+      });
+
+      void deliverOrgWebhook({
+        organizationId: job.organizationId,
+        event: "provision.failed",
+        data: { requestId: job.requestId, error: message.slice(0, 500) },
+      });
+    }
 
     await db
       .update(fulfillmentJob)
       .set({
-        status: "failed",
+        status: nextStatus,
         lastError: message.slice(0, 2000),
         updatedAt: new Date(),
       })
       .where(eq(fulfillmentJob.id, jobId));
 
-    throw err;
+    if (exhausted) {
+      throw err;
+    }
   }
 }
 
@@ -109,16 +141,20 @@ export async function processStaleFulfillmentJobs(limit: number): Promise<{
   processed: number;
   errors: number;
 }> {
-  const pending = await db
+  const candidates = await db
     .select({ id: fulfillmentJob.id })
     .from(fulfillmentJob)
-    .where(eq(fulfillmentJob.status, "pending"))
+    .where(
+      and(
+        inArray(fulfillmentJob.status, ["pending", "failed", "processing"]),
+      ),
+    )
     .orderBy(asc(fulfillmentJob.createdAt))
     .limit(limit);
 
   let errors = 0;
   let processed = 0;
-  for (const row of pending) {
+  for (const row of candidates) {
     try {
       await processFulfillmentJobById(row.id);
       processed++;

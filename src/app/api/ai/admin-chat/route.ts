@@ -6,6 +6,7 @@ import {
   getOrgLanguageModel,
 } from "@/server/ai/client";
 import { ADMIN_CATALOG_COPILOT_SYSTEM } from "@/server/ai/prompts";
+import { assertAiRequestGuard } from "@/server/ai/request-guard";
 import { recordAuditEvent } from "@/server/audit";
 
 export const maxDuration = 60;
@@ -35,6 +36,20 @@ export async function POST(req: Request) {
   const messages = body.messages ?? [];
   if (!Array.isArray(messages)) {
     return new Response("messages must be an array", { status: 400 });
+  }
+  try {
+    assertAiRequestGuard({
+      req,
+      organizationId: orgId,
+      userId: session.user.id,
+      messages,
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Rate limit exceeded";
+    const status = typeof (e as { status?: unknown })?.status === "number"
+      ? ((e as { status: number }).status)
+      : 429;
+    return new Response(message, { status });
   }
 
   try {

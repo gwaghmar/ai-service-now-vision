@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, desc, eq, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import {
@@ -10,7 +10,13 @@ import {
 import { requireSession } from "@/lib/session";
 import { requestStatusLabel } from "@/lib/status-labels";
 
-export default async function ApprovalsPage() {
+const PAGE_SIZE = 25;
+
+export default async function ApprovalsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ before?: string }>;
+}) {
   const session = await requireSession();
   const role = (session.user as { role?: string }).role ?? "requester";
   if (role !== "approver" && role !== "admin") {
@@ -22,14 +28,16 @@ export default async function ApprovalsPage() {
     return <p className="text-red-600">No organization.</p>;
   }
 
+  const { before } = await searchParams;
+  const cursor = before ? new Date(before) : null;
+
   const statusClause = or(
     eq(requestTable.status, "pending_approval"),
     eq(requestTable.status, "needs_info"),
   );
 
   const uid = session.user.id;
-  const routingMatchJson = JSON.stringify([uid]);
-  const inRoutingPool = sql`coalesce(${requestTable.routingApproverIds}, '[]'::jsonb) @> ${sql.raw(`'${routingMatchJson}'`)}::jsonb`;
+  const inRoutingPool = sql`coalesce(${requestTable.routingApproverIds}, '[]'::jsonb) @> ${JSON.stringify([uid])}::jsonb`;
 
   const approverClause =
     role === "admin"
@@ -40,14 +48,16 @@ export default async function ApprovalsPage() {
           inRoutingPool,
         );
 
-  const whereExpr =
-    approverClause === undefined
-      ? and(eq(requestTable.organizationId, orgId), statusClause)
-      : and(
-          eq(requestTable.organizationId, orgId),
-          statusClause,
-          approverClause,
-        );
+  const cursorClause = cursor ? lt(requestTable.createdAt, cursor) : undefined;
+
+  const conditions = [
+    eq(requestTable.organizationId, orgId),
+    statusClause,
+    approverClause,
+    cursorClause,
+  ].filter(Boolean);
+
+  const whereExpr = and(...(conditions as Parameters<typeof and>));
 
   const rows = await db
     .select({
@@ -62,7 +72,14 @@ export default async function ApprovalsPage() {
     .innerJoin(requestType, eq(requestTable.requestTypeId, requestType.id))
     .innerJoin(user, eq(requestTable.requesterId, user.id))
     .where(whereExpr)
-    .orderBy(desc(requestTable.createdAt));
+    .orderBy(desc(requestTable.createdAt))
+    .limit(PAGE_SIZE + 1);
+
+  const hasMore = rows.length > PAGE_SIZE;
+  const pageRows = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
+  const nextCursor = hasMore
+    ? pageRows[pageRows.length - 1]?.createdAt?.toISOString()
+    : null;
 
   return (
     <div className="space-y-6">
@@ -70,10 +87,17 @@ export default async function ApprovalsPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Approvals</h1>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
           Summary-first cards; open a request to decide.
+          {cursor && (
+            <span className="ml-2">
+              <Link href="/approvals" className="font-medium underline">
+                Back to first page
+              </Link>
+            </span>
+          )}
         </p>
       </div>
       <ul className="space-y-3">
-        {rows.length === 0 ? (
+        {pageRows.length === 0 ? (
           <li className="rounded-xl border border-dashed border-zinc-200 px-4 py-8 text-sm text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">
             <p>No pending items.</p>
             {role === "admin" && (
@@ -91,7 +115,7 @@ export default async function ApprovalsPage() {
             )}
           </li>
         ) : (
-          rows.map((r) => (
+          pageRows.map((r) => (
             <li key={r.id}>
               <Link
                 href={`/requests/${r.id}`}
@@ -130,6 +154,16 @@ export default async function ApprovalsPage() {
           ))
         )}
       </ul>
+      {nextCursor && (
+        <div className="flex justify-center pt-2">
+          <Link
+            href={`/approvals?before=${encodeURIComponent(nextCursor)}`}
+            className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          >
+            Load older items
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

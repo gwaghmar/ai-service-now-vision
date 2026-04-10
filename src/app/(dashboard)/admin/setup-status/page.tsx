@@ -64,7 +64,12 @@ export default async function AdminSetupStatusPage() {
   const [catalogRow] = await db
     .select({ n: count() })
     .from(requestType)
-    .where(eq(requestType.organizationId, orgId));
+    .where(
+      and(
+        eq(requestType.organizationId, orgId),
+        isNull(requestType.archivedAt),
+      ),
+    );
   const catalogOk = Number(catalogRow?.n ?? 0) > 0;
 
   const [routeRow] = await db

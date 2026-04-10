@@ -5,13 +5,13 @@ Web app for the flow **request → approve → fulfill (connector) → audit + C
 ## Prerequisites
 
 - Node.js 20+
-- PostgreSQL (local install, or Docker via `docker compose up -d`)
+- **PostgreSQL** — easiest path: [**Supabase** (cloud)](https://supabase.com/dashboard); set `DATABASE_URL` from **Project Settings → Database** (see `supabase/README.md`). No Docker required. You can use any other Postgres host instead.
 
 ## Setup
 
-1. Copy `.env.example` to `.env` and set:
+1. Copy `.env.example` to `.env` or `.env.local` and set:
 
-   - `DATABASE_URL` — PostgreSQL connection string (production: use `sslmode=require` or `verify-full`, never `sslmode=no-verify`)
+   - `DATABASE_URL` — Postgres connection string. For Supabase cloud, use the **Direct** URI with `sslmode=require`. Production: never commit `sslmode=no-verify`.
    - `BETTER_AUTH_SECRET` — at least 32 characters (`openssl rand -base64 32`)
    - `BETTER_AUTH_URL` — e.g. `http://localhost:3000`
    - `NEXT_PUBLIC_APP_URL` — same as public base URL
@@ -23,13 +23,12 @@ Web app for the flow **request → approve → fulfill (connector) → audit + C
 
    In **production**, the app **fails fast on boot** if required env vars are missing, if `DATABASE_URL` uses `sslmode=no-verify`, if neither default-org env is set, or if `PROVISION_CONNECTOR=stub` without `ALLOW_STUB_PROVISION=true`.
 
-2. Push schema:
+2. Apply schema to the database:
 
-   ```bash
-   npm run db:push
-   ```
+   - **New empty database (recommended for prod):** `npm run db:migrate` (after `npm run db:generate` when you change schema).
+   - **Quick setup against Supabase/dev:** `npm run db:supabase:sync` runs `db:push` + `db:seed`.
 
-   Or generate/apply migrations with `npm run db:generate` and `npm run db:migrate`.
+   If you already used `db:push` and later run `db:migrate`, you may need an empty DB or a migration baseline — see `supabase/README.md`.
 
 3. Seed demo org + request types:
 

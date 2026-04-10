@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { db } from "@/db";
@@ -49,6 +49,7 @@ export async function suggestRequestPayloadAction(input: {
       and(
         eq(requestType.id, input.requestTypeId),
         eq(requestType.organizationId, orgId),
+        isNull(requestType.archivedAt),
       ),
     )
     .limit(1);

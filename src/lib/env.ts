@@ -63,6 +63,26 @@ export function assertProductionEnv(): void {
       throw new Error("[env] PROVISION_WEBHOOK_URL must be a valid URL");
     }
   }
+
+  const keyB64 = process.env.FIELD_ENCRYPTION_KEY?.trim();
+  if (!keyB64) {
+    throw new Error(
+      "[env] FIELD_ENCRYPTION_KEY is required in production to protect stored secrets.",
+    );
+  }
+  const key = Buffer.from(keyB64, "base64");
+  if (key.length !== 32) {
+    throw new Error(
+      "[env] FIELD_ENCRYPTION_KEY must decode to exactly 32 bytes (base64).",
+    );
+  }
+
+  if (!process.env.API_KEY_PEPPER?.trim()) {
+    console.warn(
+      "[env] API_KEY_PEPPER is not set. Falling back to BETTER_AUTH_SECRET for API key hashing. " +
+      "Set API_KEY_PEPPER to a dedicated secret so rotating BETTER_AUTH_SECRET does not invalidate API keys.",
+    );
+  }
 }
 
 function addLocalLoopbackAliases(origins: Set<string>): void {

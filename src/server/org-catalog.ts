@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { requestType } from "@/db/schema";
 
@@ -12,6 +12,11 @@ export async function fetchOrgCatalogTiles(organizationId: string) {
       description: requestType.description,
     })
     .from(requestType)
-    .where(eq(requestType.organizationId, organizationId))
+    .where(
+      and(
+        eq(requestType.organizationId, organizationId),
+        isNull(requestType.archivedAt),
+      ),
+    )
     .orderBy(asc(requestType.title));
 }

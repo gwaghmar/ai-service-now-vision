@@ -2,6 +2,10 @@ import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
 
 const PREFIX = "enc:v1:";
 
+function isProduction(): boolean {
+  return process.env.NODE_ENV === "production";
+}
+
 /**
  * App-level envelope encryption for stored secrets (e.g. webhook signing keys).
  * In production, prefer wrapping the data key with **KMS** (AWS KMS, GCP CKM,
@@ -11,7 +15,14 @@ const PREFIX = "enc:v1:";
  */
 export function encryptFieldIfConfigured(plain: string): string {
   const keyB64 = process.env.FIELD_ENCRYPTION_KEY?.trim();
-  if (!keyB64) return plain;
+  if (!keyB64) {
+    if (isProduction()) {
+      throw new Error(
+        "FIELD_ENCRYPTION_KEY is required in production before storing sensitive fields.",
+      );
+    }
+    return plain;
+  }
   const key = Buffer.from(keyB64, "base64");
   if (key.length !== 32) {
     throw new Error("FIELD_ENCRYPTION_KEY must be 32 bytes (base64-encoded).");

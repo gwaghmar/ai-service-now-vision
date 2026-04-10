@@ -168,23 +168,30 @@ export function RoutingAdminClient({
 function DeleteRuleButton({ ruleId }: { ruleId: string }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   return (
-    <button
-      type="button"
-      disabled={pending}
-      className="rounded border border-red-200 px-2 py-0.5 text-xs text-red-700 disabled:opacity-40 dark:border-red-900/60 dark:text-red-400"
-      onClick={async () => {
-        setPending(true);
-        try {
-          await adminDeleteRoutingRule({ id: ruleId });
-          router.refresh();
-        } catch {
-          /* ignore */
-        }
-        setPending(false);
-      }}
-    >
-      Remove
-    </button>
+    <span className="flex flex-col items-end gap-0.5">
+      <button
+        type="button"
+        disabled={pending}
+        className="rounded border border-red-200 px-2 py-0.5 text-xs text-red-700 disabled:opacity-40 dark:border-red-900/60 dark:text-red-400"
+        onClick={async () => {
+          setPending(true);
+          setErr(null);
+          try {
+            await adminDeleteRoutingRule({ id: ruleId });
+            router.refresh();
+          } catch (e) {
+            setErr(e instanceof Error ? e.message : "Failed to remove rule");
+            setPending(false);
+          }
+        }}
+      >
+        {pending ? "Removing…" : "Remove"}
+      </button>
+      {err && (
+        <span className="text-xs text-red-600 dark:text-red-400">{err}</span>
+      )}
+    </span>
   );
 }

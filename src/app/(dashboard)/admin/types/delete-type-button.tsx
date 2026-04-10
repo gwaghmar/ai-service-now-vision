@@ -3,30 +3,64 @@
 import { useState } from "react";
 import { adminDeleteRequestType } from "@/app/actions/admin";
 
-export function DeleteTypeButton({ id, slug }: { id: string; slug: string }) {
+export function DeleteTypeButton({
+  id,
+  slug,
+  requestCount,
+  archived,
+}: {
+  id: string;
+  slug: string;
+  requestCount: number;
+  archived: boolean;
+}) {
   const [pending, setPending] = useState(false);
+
+  const label = archived
+    ? requestCount > 0
+      ? "Archived"
+      : "Delete permanently"
+    : requestCount > 0
+      ? "Archive"
+      : "Delete";
+
+  if (archived && requestCount > 0) {
+    return (
+      <span className="text-xs text-zinc-500 dark:text-zinc-400">
+        Archived · {requestCount} request{requestCount === 1 ? "" : "s"}
+      </span>
+    );
+  }
+
   return (
     <button
       type="button"
       disabled={pending}
       onClick={async () => {
-        if (
-          !confirm(`Delete request type “${slug}”? Only allowed if no requests use it.`)
-        ) {
-          return;
-        }
+        const msg = archived
+          ? `Permanently delete request type “${slug}”? This frees the slug.`
+          : requestCount > 0
+            ? `Archive “${slug}”? It will disappear from the catalog and API, but existing requests stay linked.`
+            : `Delete request type “${slug}”? No requests use it yet.`;
+        if (!confirm(msg)) return;
         setPending(true);
         try {
           await adminDeleteRequestType({ id });
           window.location.reload();
         } catch (e) {
-          alert(e instanceof Error ? e.message : "Delete failed");
+          alert(e instanceof Error ? e.message : "Action failed");
           setPending(false);
         }
       }}
-      className="text-xs text-red-600 underline disabled:opacity-50"
+      className={
+        archived
+          ? "text-xs text-red-600 underline disabled:opacity-50"
+          : requestCount > 0
+            ? "text-xs text-amber-700 underline dark:text-amber-400 disabled:opacity-50"
+            : "text-xs text-red-600 underline disabled:opacity-50"
+      }
     >
-      Delete
+      {pending ? "…" : label}
     </button>
   );
 }

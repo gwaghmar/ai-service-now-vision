@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { request as requestTable, requestType, user } from "@/db/schema";
 import { recordAuditEvent } from "@/server/audit";
@@ -112,6 +112,7 @@ export async function findRequestTypeBySlug(
       and(
         eq(requestType.organizationId, organizationId),
         eq(requestType.slug, slug),
+        isNull(requestType.archivedAt),
       ),
     )
     .limit(1);

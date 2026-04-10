@@ -2,10 +2,18 @@ import { createHash, randomBytes } from "crypto";
 
 const PREFIX = "gk";
 
+/**
+ * Dedicated pepper for API key hashing.
+ * Uses API_KEY_PEPPER if set; falls back to BETTER_AUTH_SECRET so existing
+ * hashes remain valid during migration.  In production, set API_KEY_PEPPER
+ * to a separate secret so rotating BETTER_AUTH_SECRET doesn't invalidate keys.
+ */
 function pepper() {
-  const s = process.env.BETTER_AUTH_SECRET;
-  if (!s) throw new Error("BETTER_AUTH_SECRET is not set");
-  return s;
+  const dedicated = process.env.API_KEY_PEPPER?.trim();
+  if (dedicated) return dedicated;
+  const fallback = process.env.BETTER_AUTH_SECRET;
+  if (fallback) return fallback;
+  throw new Error("API_KEY_PEPPER (or BETTER_AUTH_SECRET as fallback) is not set");
 }
 
 export function hashApiKey(plaintext: string) {

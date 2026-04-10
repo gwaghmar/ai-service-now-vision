@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { request as requestTable, requestType } from "@/db/schema";
@@ -61,11 +61,12 @@ export async function createRequestAction(input: {
       and(
         eq(requestType.id, requestTypeId),
         eq(requestType.organizationId, orgId),
+        isNull(requestType.archivedAt),
       ),
     )
     .limit(1);
 
-  if (!type) throw new Error("Request type not found.");
+  if (!type) throw new Error("Request type not found or archived.");
 
   const fieldSchema = parseFieldSchema(type.fieldSchema);
   const parsed = buildPayloadSchema(fieldSchema.fields).safeParse(payload);

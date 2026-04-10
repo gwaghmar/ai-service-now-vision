@@ -97,10 +97,15 @@ export function RequestsHub({
   catalog,
   requests,
   isAdmin,
+  listPagination,
 }: {
   catalog: CatalogTile[];
   requests: MyRequestRow[];
   isAdmin: boolean;
+  listPagination?: {
+    cursorActive: boolean;
+    nextBeforeIso: string | null;
+  };
 }) {
   const searchParams = useSearchParams();
   const q = (searchParams.get("q") ?? "").trim().toLowerCase();
@@ -154,10 +159,20 @@ export function RequestsHub({
           <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
             Your requests
           </h2>
-          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            Filter with the search box in the header (reference, type, status,
-            or approver).
-          </p>
+        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+          Filter with the search box in the header (reference, type, status,
+          or approver).
+          {listPagination?.cursorActive ? (
+            <span className="ml-2">
+              <Link
+                href="/requests"
+                className="font-medium text-zinc-900 underline dark:text-zinc-100"
+              >
+                Back to first page
+              </Link>
+            </span>
+          ) : null}
+        </p>
         </div>
 
         <ul className="mt-3 space-y-2.5">
@@ -219,6 +234,16 @@ export function RequestsHub({
             ))
           )}
         </ul>
+        {listPagination?.nextBeforeIso ? (
+          <div className="mt-3 flex justify-center">
+            <Link
+              href={`/requests?before=${encodeURIComponent(listPagination.nextBeforeIso)}`}
+              className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            >
+              Load older requests
+            </Link>
+          </div>
+        ) : null}
       </section>
     </div>
   );

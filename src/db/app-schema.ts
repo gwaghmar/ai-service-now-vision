@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   pgTable,
   text,
@@ -58,12 +58,14 @@ export const requestType = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
+    /** Soft-delete: set instead of hard-deleting so existing requests are not orphaned. */
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
   },
   (t) => [
-    uniqueIndex("request_type_org_slug_unique").on(
-      t.organizationId,
-      t.slug,
-    ),
+    /** Slug unique among non-archived rows so a new type can reuse a retired slug. */
+    uniqueIndex("request_type_org_slug_unique")
+      .on(t.organizationId, t.slug)
+      .where(sql`${t.archivedAt} is null`),
   ],
 );
 
@@ -163,7 +165,12 @@ export const approval = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (t) => [index("approval_request_idx").on(t.requestId)],
+  (t) => [
+    index("approval_request_idx").on(t.requestId),
+    uniqueIndex("approval_request_terminal_unique")
+      .on(t.requestId)
+      .where(sql`${t.decision} in ('approved', 'denied')`),
+  ],
 );
 
 /** Durable async fulfillment work (provision connector). */
@@ -195,6 +202,9 @@ export const fulfillmentJob = pgTable(
   (t) => [
     index("fulfillment_job_org_status_idx").on(t.organizationId, t.status),
     index("fulfillment_job_request_idx").on(t.requestId),
+    uniqueIndex("fulfillment_job_request_open_unique")
+      .on(t.requestId)
+      .where(sql`${t.status} in ('pending', 'processing')`),
   ],
 );
 
@@ -257,6 +267,49 @@ export const changeTicket = pgTable(
     index("change_ticket_org_created_idx").on(t.organizationId, t.createdAt),
   ],
 );
+
+/**
+ * Durable outbound webhook delivery log with retry.
+ * Statuses: pending → delivering → delivered | failed (exhausted)
+ */
+export const webhookDelivery = pgTable(
+  "webhook_delivery",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    event: text("event").notNull(),
+    payload: text("payload").notNull(),
+    targetUrl: text("target_url").notNull(),
+    signingSecret: text("signing_secret"),
+    status: text("status").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    maxAttempts: integer("max_attempts").notNull().default(3),
+    lastError: text("last_error"),
+    nextRetryAt: timestamp("next_retry_at", { withTimezone: true }),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [
+    index("webhook_delivery_org_status_idx").on(t.organizationId, t.status),
+    index("webhook_delivery_next_retry_idx").on(t.nextRetryAt),
+    index("webhook_delivery_status_retry_idx").on(t.status, t.nextRetryAt),
+  ],
+);
+
+export const webhookDeliveryRelations = relations(webhookDelivery, ({ one }) => ({
+  organization: one(organization, {
+    fields: [webhookDelivery.organizationId],
+    references: [organization.id],
+  }),
+}));
 
 /** Append-only audit stream: application code must only INSERT. */
 export const auditEvent = pgTable(
@@ -437,6 +490,7 @@ export const organizationRelations = relations(organization, ({ many, one }) => 
   apiKeys: many(apiKey),
   fulfillmentJobs: many(fulfillmentJob),
   approvalRoutingRules: many(approvalRoutingRule),
+  webhookDeliveries: many(webhookDelivery),
   aiSettings: one(organizationAiSettings),
   onboarding: one(organizationOnboarding),
   invites: many(organizationInvite),

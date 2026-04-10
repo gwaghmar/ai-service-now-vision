@@ -6,17 +6,29 @@ type PolicyInput = {
   payload: Record<string, unknown>;
 };
 
+function policyFailOpenEnabled(): boolean {
+  const mode = process.env.POLICY_ENGINE_FAIL_MODE?.trim().toLowerCase();
+  if (mode === "closed") return false;
+  if (mode === "open") return true;
+  return process.env.NODE_ENV !== "production";
+}
+
 /**
  * Optional HTTP policy adapter (OPA / OpenFGA-style sidecar, custom service).
  * POST JSON body; expect 200 + `{ "decision": "allow" | "deny", "reason"?: string }`.
- * On network errors or invalid response, **fails open** (allow) so local dev works.
+ * On network errors or invalid response, defaults to fail-open in non-production
+ * and fail-closed in production unless POLICY_ENGINE_FAIL_MODE overrides.
  */
 export async function evaluatePolicyOrThrow(input: PolicyInput) {
   const url = process.env.POLICY_ENGINE_URL?.trim();
   if (!url) return;
 
+  const timeoutMs = Math.max(
+    500,
+    Math.min(30_000, Number(process.env.POLICY_ENGINE_TIMEOUT_MS) || 8_000),
+  );
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 8_000);
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const res = await fetch(url, {
       method: "POST",
@@ -28,7 +40,12 @@ export async function evaluatePolicyOrThrow(input: PolicyInput) {
         payload: input.payload,
       }),
     });
-    if (!res.ok) return;
+    if (!res.ok) {
+      if (!policyFailOpenEnabled()) {
+        throw new PolicyDeniedError("Policy engine unavailable.");
+      }
+      return;
+    }
     const json = (await res.json()) as {
       decision?: string;
       reason?: string;
@@ -39,6 +56,9 @@ export async function evaluatePolicyOrThrow(input: PolicyInput) {
   } catch (e) {
     if (e instanceof PolicyDeniedError) throw e;
     console.warn("[policy-engine] evaluation skipped or failed:", e);
+    if (!policyFailOpenEnabled()) {
+      throw new PolicyDeniedError("Policy engine evaluation failed.");
+    }
   } finally {
     clearTimeout(t);
   }

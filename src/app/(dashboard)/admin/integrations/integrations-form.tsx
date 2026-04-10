@@ -79,7 +79,13 @@ export function IntegrationsForm({ initialUrl }: { initialUrl: string }) {
       >
         {pending ? "Saving…" : "Save webhooks"}
       </button>
-      {msg ? <p className="text-sm text-zinc-700 dark:text-zinc-300">{msg}</p> : null}
+      {msg ? (
+        <p
+          className={`text-sm ${msg === "Saved." ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}
+        >
+          {msg}
+        </p>
+      ) : null}
     </form>
   );
 }

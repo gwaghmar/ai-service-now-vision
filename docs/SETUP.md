@@ -11,9 +11,11 @@ Use this when onboarding a new environment (startup, staging, production).
 
 ## 1. Database and schema
 
-1. Set `DATABASE_URL` in `.env` or the host secret store.
-2. Run `npm run db:push` (or apply SQL under `drizzle/`, including `0005_ai_onboarding_invite_email.sql`).
-3. Seed demo org/types if desired: `npm run db:seed`.
+1. **Supabase (cloud, no Docker):** Create a project, copy **Database → Connection string (URI, Direct, `sslmode=require`)** into `DATABASE_URL` in `.env` / `.env.local`. Details: `supabase/README.md`.
+2. Apply schema:
+   - **Production / clean DB:** `npm run db:migrate` (SQL under `drizzle/`).
+   - **Fast dev:** `npm run db:supabase:sync` (`db:push` + `db:seed`), or `npm run db:push` alone then `npm run db:seed`.
+3. Avoid mixing `db:push` and `db:migrate` on the same database without a baseline; prefer migrate for long-lived environments.
 
 ## 2. Auth and URLs
 

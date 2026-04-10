@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, lt } from "drizzle-orm";
 import { db } from "@/db";
 import {
   request as requestTable,
@@ -12,7 +12,16 @@ import { fetchOrgCatalogTiles } from "@/server/org-catalog";
 
 export const dynamic = "force-dynamic";
 
-export default async function RequestsHubPage() {
+const PAGE_SIZE = 25;
+
+export default async function RequestsHubPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ before?: string }>;
+}) {
+  const { before } = await searchParams;
+  const cursor = before ? new Date(before) : null;
+
   const session = await requireSession();
   const orgId = session.user.organizationId;
   if (!orgId) {
@@ -30,16 +39,27 @@ export default async function RequestsHubPage() {
       status: requestTable.status,
       typeTitle: requestType.title,
       assignedApproverId: requestTable.assignedApproverId,
+      createdAt: requestTable.createdAt,
     })
     .from(requestTable)
     .innerJoin(requestType, eq(requestTable.requestTypeId, requestType.id))
-    .where(eq(requestTable.requesterId, session.user.id))
+    .where(
+      cursor
+        ? and(
+            eq(requestTable.requesterId, session.user.id),
+            lt(requestTable.createdAt, cursor),
+          )
+        : eq(requestTable.requesterId, session.user.id),
+    )
     .orderBy(desc(requestTable.createdAt))
-    .limit(30);
+    .limit(PAGE_SIZE + 1);
+
+  const hasMore = rawRows.length > PAGE_SIZE;
+  const pageRows = hasMore ? rawRows.slice(0, PAGE_SIZE) : rawRows;
 
   const approverIds = [
     ...new Set(
-      rawRows
+      pageRows
         .map((r) => r.assignedApproverId)
         .filter((id): id is string => Boolean(id)),
     ),
@@ -55,7 +75,11 @@ export default async function RequestsHubPage() {
     approverRows.map((a) => [a.id, a.email] as const),
   );
 
-  const myRequests = rawRows.map((r) => ({
+  const nextCursor = hasMore
+    ? pageRows[pageRows.length - 1]?.createdAt?.toISOString() ?? null
+    : null;
+
+  const myRequests = pageRows.map((r) => ({
     id: r.id,
     status: r.status,
     typeTitle: r.typeTitle,
@@ -70,6 +94,10 @@ export default async function RequestsHubPage() {
         catalog={catalog}
         requests={myRequests}
         isAdmin={isAdmin}
+        listPagination={{
+          cursorActive: Boolean(cursor),
+          nextBeforeIso: nextCursor,
+        }}
       />
     </Suspense>
   );

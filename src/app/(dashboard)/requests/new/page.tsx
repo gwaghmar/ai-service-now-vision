@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { requestType } from "@/db/schema";
 import { requireSession } from "@/lib/session";
@@ -19,7 +19,12 @@ export default async function NewRequestPage({
   const types = await db
     .select()
     .from(requestType)
-    .where(eq(requestType.organizationId, orgId));
+    .where(
+      and(
+        eq(requestType.organizationId, orgId),
+        isNull(requestType.archivedAt),
+      ),
+    );
 
   if (types.length === 0) {
     return (

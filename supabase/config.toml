@@ -1,3 +1,6 @@
+# Local Supabase stack only (requires Docker). For cloud Postgres, you only need
+# DATABASE_URL in .env.local — see supabase/README.md in this repo.
+#
 # For detailed configuration reference documentation, visit:
 # https://supabase.com/docs/guides/local-development/cli/config
 # A string used to distinguish different Supabase projects on the same host. Defaults to the

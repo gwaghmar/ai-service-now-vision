@@ -2,7 +2,7 @@
 
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
-import { and, count, eq, or } from "drizzle-orm";
+import { and, count, eq, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import {
@@ -18,6 +18,7 @@ import {
 import { generateApiKeyMaterial } from "@/lib/api-key-crypto";
 import { encryptFieldIfConfigured } from "@/lib/field-encryption";
 import { parseFieldSchema } from "@/lib/request-schemas";
+import { assertSafeOutboundHttpUrl } from "@/lib/safe-url";
 import { requireSession } from "@/lib/session";
 
 const roleSchema = z.enum(["requester", "approver", "admin"]);
@@ -194,11 +195,19 @@ export async function adminDeleteRequestType(input: { id: string }) {
     .from(requestTable)
     .where(eq(requestTable.requestTypeId, row.id));
 
-  if (usage.n > 0) {
-    throw new Error("Cannot delete a type that has existing requests.");
+  if (row.archivedAt) {
+    if (usage.n > 0) {
+      throw new Error("This type is already archived.");
+    }
+    await db.delete(requestType).where(eq(requestType.id, row.id));
+  } else if (usage.n > 0) {
+    await db
+      .update(requestType)
+      .set({ archivedAt: new Date() })
+      .where(eq(requestType.id, row.id));
+  } else {
+    await db.delete(requestType).where(eq(requestType.id, row.id));
   }
-
-  await db.delete(requestType).where(eq(requestType.id, row.id));
 
   revalidatePath("/admin/types");
   revalidatePath("/requests/new");
@@ -246,10 +255,8 @@ export async function adminUpdateOrgWebhooks(input: {
     .safeParse(input);
   if (!boundary.success) throw new Error("Invalid webhook settings.");
 
-  const url = boundary.data.webhookUrl.trim();
-  if (url.length > 0 && !URL.canParse(url)) {
-    throw new Error("Webhook URL must be a valid http(s) URL.");
-  }
+  const rawUrl = boundary.data.webhookUrl.trim();
+  const url = rawUrl.length > 0 ? assertSafeOutboundHttpUrl(rawUrl) : "";
   let secret: string | null | undefined;
   if (boundary.data.clearSecret) {
     secret = null;
@@ -316,6 +323,7 @@ export async function adminBulkCreateRequestTypes(input: {
           and(
             eq(requestType.organizationId, orgId),
             eq(requestType.slug, item.slug),
+            isNull(requestType.archivedAt),
           ),
         )
         .limit(1);
@@ -419,10 +427,14 @@ export async function adminAddRoutingRule(input: {
       .select({ id: requestType.id })
       .from(requestType)
       .where(
-        and(eq(requestType.id, typeId), eq(requestType.organizationId, orgId)),
+        and(
+          eq(requestType.id, typeId),
+          eq(requestType.organizationId, orgId),
+          isNull(requestType.archivedAt),
+        ),
       )
       .limit(1);
-    if (!t) throw new Error("Request type not found.");
+    if (!t) throw new Error("Request type not found or archived.");
   }
 
   await db.insert(approvalRoutingRule).values({

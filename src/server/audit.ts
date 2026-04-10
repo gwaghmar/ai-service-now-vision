@@ -2,6 +2,10 @@ import { randomUUID } from "crypto";
 import { db } from "@/db";
 import { auditEvent } from "@/db/schema";
 
+type InsertExecutor = {
+  insert: typeof db.insert;
+};
+
 export async function recordAuditEvent(input: {
   organizationId: string;
   actorId: string | null;
@@ -9,8 +13,8 @@ export async function recordAuditEvent(input: {
   entityId: string;
   action: string;
   metadata?: Record<string, unknown>;
-}) {
-  await db.insert(auditEvent).values({
+}, executor: InsertExecutor = db) {
+  await executor.insert(auditEvent).values({
     id: randomUUID(),
     organizationId: input.organizationId,
     actorId: input.actorId,

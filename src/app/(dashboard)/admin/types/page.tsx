@@ -1,6 +1,6 @@
-import { desc, eq } from "drizzle-orm";
+import { count, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { requestType } from "@/db/schema";
+import { request as requestTable, requestType } from "@/db/schema";
 import { requireSession } from "@/lib/session";
 import { AdminCatalogCopilot } from "@/components/admin-catalog-copilot";
 import { DeleteTypeButton } from "./delete-type-button";
@@ -21,6 +21,18 @@ export default async function AdminTypesPage() {
     .where(eq(requestType.organizationId, orgId))
     .orderBy(desc(requestType.createdAt));
 
+  const usageRows = await db
+    .select({
+      requestTypeId: requestTable.requestTypeId,
+      n: count(),
+    })
+    .from(requestTable)
+    .where(eq(requestTable.organizationId, orgId))
+    .groupBy(requestTable.requestTypeId);
+  const usageByTypeId = new Map(
+    usageRows.map((r) => [r.requestTypeId, Number(r.n)] as const),
+  );
+
   return (
     <>
     <div className="space-y-7">
@@ -40,7 +52,10 @@ export default async function AdminTypesPage() {
       </section>
 
       <ul className="space-y-4">
-        {types.map((t) => (
+        {types.map((t) => {
+          const requestCount = usageByTypeId.get(t.id) ?? 0;
+          const archived = Boolean(t.archivedAt);
+          return (
           <li
             key={t.id}
             className="rounded-xl border border-zinc-200 bg-white p-3.5 dark:border-zinc-800 dark:bg-zinc-900"
@@ -49,8 +64,18 @@ export default async function AdminTypesPage() {
               <div>
                 <span className="font-medium">{t.title}</span>
                 <span className="ml-2 text-xs text-zinc-500">({t.slug})</span>
+                {archived ? (
+                  <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950/80 dark:text-amber-200">
+                    Archived
+                  </span>
+                ) : null}
               </div>
-              <DeleteTypeButton id={t.id} slug={t.slug} />
+              <DeleteTypeButton
+                id={t.id}
+                slug={t.slug}
+                requestCount={requestCount}
+                archived={archived}
+              />
             </div>
             {t.description && (
               <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
@@ -74,7 +99,8 @@ export default async function AdminTypesPage() {
               />
             </details>
           </li>
-        ))}
+          );
+        })}
       </ul>
     </div>
     <AdminCatalogCopilot />

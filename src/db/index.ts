@@ -11,15 +11,16 @@ const globalForPool = globalThis as unknown as { pgPool?: pg.Pool };
 
 /** Supabase needs explicit parsed credentials — sslmode in URL conflicts with pg's ssl option. */
 function buildPoolConfig(): pg.PoolConfig {
+  const cs = connectionString!;
   const base = {
     max: Math.min(20, Number(process.env.PGPOOL_MAX ?? 10)),
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 15_000,
   };
-  if (!connectionString.includes("supabase.co")) {
-    return { connectionString, ...base };
+  if (!cs.includes("supabase.co")) {
+    return { connectionString: cs, ...base };
   }
-  const u = new URL(connectionString.replace(/^postgresql:/i, "http:").replace(/^postgres:/i, "http:"));
+  const u = new URL(cs.replace(/^postgresql:/i, "http:").replace(/^postgres:/i, "http:"));
   return {
     host: u.hostname,
     port: Number(u.port || 5432),

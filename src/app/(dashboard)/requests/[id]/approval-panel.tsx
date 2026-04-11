@@ -1,9 +1,13 @@
 "use client";
 
 import { useId, useState } from "react";
+import { useRouter } from "next/navigation";
 import { decideApprovalAction } from "@/app/actions/requests";
+import { useToast } from "@/components/toast";
 
 export function ApprovalPanel({ requestId }: { requestId: string }) {
+  const router = useRouter();
+  const { toast } = useToast();
   const [comment, setComment] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -14,9 +18,12 @@ export function ApprovalPanel({ requestId }: { requestId: string }) {
     setPending(true);
     try {
       await decideApprovalAction({ requestId, decision, comment });
-      window.location.reload();
+      const label = decision === "approved" ? "Approved" : decision === "denied" ? "Denied" : "Sent back for info";
+      toast(label, decision === "approved" ? "success" : "info");
+      router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed");
+      toast(e instanceof Error ? e.message : "Action failed", "error");
       setPending(false);
     }
   }

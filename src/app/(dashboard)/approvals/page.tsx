@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { and, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
@@ -18,7 +18,7 @@ export default async function ApprovalsPage({
   searchParams: Promise<{ before?: string }>;
 }) {
   const session = await requireSession();
-  const role = (session.user as { role?: string }).role ?? "requester";
+  const role = session.user.role;
   if (role !== "approver" && role !== "admin") {
     redirect("/");
   }

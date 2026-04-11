@@ -13,6 +13,24 @@ const securityHeaders = [
     key: "Permissions-Policy",
     value: "camera=(), microphone=(), geolocation=()",
   },
+  {
+    key: "Content-Security-Policy",
+    value: [
+      "default-src 'self'",
+      // Next.js inline scripts + RSC streaming require unsafe-inline/unsafe-eval
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      "style-src 'self' 'unsafe-inline'",
+      // Resend tracking pixel (optional), allow same-origin images and data URIs
+      "img-src 'self' data: blob:",
+      // Fonts served self-hosted (Geist via next/font)
+      "font-src 'self'",
+      // AI API calls go through our own API routes (server-side), no browser fetch to 3rd parties
+      "connect-src 'self'",
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join("; "),
+  },
 ];
 
 const nextConfig: NextConfig = {

@@ -1,7 +1,9 @@
 "use client";
 
 import { useId, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { resubmitRequestAfterInfoAction } from "@/app/actions/requests";
+import { useToast } from "@/components/toast";
 import {
   parseFieldSchema,
   type FieldSchemaJson,
@@ -16,6 +18,8 @@ export function NeedsInfoResubmit({
   fieldSchema: unknown;
   initialPayload: Record<string, unknown>;
 }) {
+  const router = useRouter();
+  const { toast } = useToast();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const formBaseId = useId();
@@ -67,9 +71,11 @@ export function NeedsInfoResubmit({
               setPending(false);
               return;
             }
-            window.location.reload();
+            toast("Resubmitted for approval", "success");
+            router.refresh();
           } catch (err) {
             setError(err instanceof Error ? err.message : "Failed");
+            toast(err instanceof Error ? err.message : "Failed", "error");
             setPending(false);
           }
         }}

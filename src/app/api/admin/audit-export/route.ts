@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { assertAuditExportRangeOrThrow } from "@/lib/audit-export-limit";
+import type { AppRole } from "@/lib/session";
 import { queryAuditExportRows } from "@/server/audit-export";
 
 export const runtime = "nodejs";
@@ -22,7 +23,7 @@ export async function GET(req: Request) {
   if (!session) {
     return new Response("Unauthorized", { status: 401 });
   }
-  const role = (session.user as { role?: string }).role ?? "requester";
+  const role = ((session.user as { role?: string }).role ?? "requester") as AppRole;
   if (role !== "admin") {
     return new Response("Forbidden", { status: 403 });
   }

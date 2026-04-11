@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { ensureOrganizationOnboardingRow } from "@/app/actions/ai-org";
 import { HomeCopilot } from "@/components/home-copilot";
@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   const session = await requireSession();
   const orgId = session.user.organizationId;
-  const role = (session.user as { role?: string }).role ?? "requester";
+  const role = session.user.role;
   const isAdmin = role === "admin";
 
   const catalog = orgId

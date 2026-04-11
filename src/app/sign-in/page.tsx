@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import { authClient } from "@/lib/auth-client";
+import { SocialSignIn } from "@/components/social-sign-in";
 import { getPublicAppName } from "@/lib/env";
 
 const appName = getPublicAppName();
@@ -41,7 +42,7 @@ export default function SignInPage() {
               setError(res.error.message ?? "Sign in failed");
               return;
             }
-            router.push("/");
+            router.push("/home");
             router.refresh();
           }}
         >
@@ -106,7 +107,17 @@ export default function SignInPage() {
           <Link href="/sign-up" className="underline">
             Sign up
           </Link>
+          {" · "}
+          <Link href="/forgot-password" className="underline">
+            Forgot password?
+          </Link>
         </p>
+        <div className="my-4 flex items-center gap-3">
+          <div className="flex-1 border-t border-zinc-200 dark:border-zinc-700" />
+          <span className="text-xs text-zinc-400">or</span>
+          <div className="flex-1 border-t border-zinc-200 dark:border-zinc-700" />
+        </div>
+        <SocialSignIn callbackURL="/home" />
       </div>
     </div>
   );

@@ -18,6 +18,11 @@ export const organization = pgTable("organization", {
   webhookUrl: text("webhook_url"),
   /** Optional secret for `X-Governance-Signature` (HMAC-SHA256 of raw body). */
   webhookSigningSecret: text("webhook_signing_secret"),
+  /** Stripe billing */
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  stripeSubscriptionStatus: text("stripe_subscription_status"),
+  stripePriceId: text("stripe_price_id"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
@@ -90,6 +95,11 @@ export const request = pgTable(
     payload: jsonb("payload").notNull().$type<Record<string, unknown>>(),
     /** Frozen at creation: user ids allowed to approve (from routing rules). */
     routingApproverIds: jsonb("routing_approver_ids").$type<string[] | null>(),
+    /** AI triage risk level: low | medium | high | critical */
+    aiTriageRisk: text("ai_triage_risk"),
+    /** One-sentence reason from the triage model. */
+    aiTriageReason: text("ai_triage_reason"),
+    aiTriageAt: timestamp("ai_triage_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -156,9 +166,10 @@ export const approval = pgTable(
     requestId: text("request_id")
       .notNull()
       .references(() => request.id, { onDelete: "cascade" }),
-    approverId: text("approver_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+    /** Nullable for system/AI auto-approvals. */
+    approverId: text("approver_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
     decision: text("decision").notNull(),
     comment: text("comment"),
     decidedAt: timestamp("decided_at", { withTimezone: true })

@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   if (!session?.user) {
     return new Response("Unauthorized", { status: 401 });
   }
-  const role = (session.user as { role?: string }).role ?? "requester";
+  const role = ((session.user as { role?: string }).role ?? "requester");
   if (role !== "admin") {
     return new Response("Forbidden", { status: 403 });
   }
@@ -38,7 +38,7 @@ export async function POST(req: Request) {
     return new Response("messages must be an array", { status: 400 });
   }
   try {
-    assertAiRequestGuard({
+    await assertAiRequestGuard({
       req,
       organizationId: orgId,
       userId: session.user.id,

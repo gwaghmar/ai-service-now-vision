@@ -43,7 +43,7 @@ export async function POST(req: Request) {
   }
 
   const ip = getClientIp(req);
-  const ipCheck = rateLimitAllow(`chat-ingest:ip:${ip}`, 60, WINDOW_MS);
+  const ipCheck = await rateLimitAllow(`chat-ingest:ip:${ip}`, 60, WINDOW_MS);
   if (!ipCheck.ok) {
     const sec = Math.max(1, Math.ceil(ipCheck.retryAfterMs / 1000));
     return Response.json(
@@ -104,6 +104,8 @@ export async function POST(req: Request) {
       requestTypeId: type.id,
       payload: payloadCheck.data as Record<string, unknown>,
       typeSlug: type.slug,
+      typeTitle: type.title,
+      typeRiskDefaults: type.riskDefaults,
       auditAction: "request_created_chat_ingest",
       auditActorId: null,
       auditMetadata: { ingest: "chat" },

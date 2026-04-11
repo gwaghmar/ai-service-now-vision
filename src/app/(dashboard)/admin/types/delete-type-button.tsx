@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { adminDeleteRequestType } from "@/app/actions/admin";
+import { useToast } from "@/components/toast";
 
 export function DeleteTypeButton({
   id,
@@ -14,6 +16,8 @@ export function DeleteTypeButton({
   requestCount: number;
   archived: boolean;
 }) {
+  const router = useRouter();
+  const { toast } = useToast();
   const [pending, setPending] = useState(false);
 
   const label = archived
@@ -46,9 +50,10 @@ export function DeleteTypeButton({
         setPending(true);
         try {
           await adminDeleteRequestType({ id });
-          window.location.reload();
+          toast(`Type "${slug}" ${archived ? "permanently deleted" : requestCount > 0 ? "archived" : "deleted"}`, "success");
+          router.refresh();
         } catch (e) {
-          alert(e instanceof Error ? e.message : "Action failed");
+          toast(e instanceof Error ? e.message : "Action failed", "error");
           setPending(false);
         }
       }}

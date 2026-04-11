@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+﻿import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { changeTemplate } from "@/db/schema";
 import { requireSession } from "@/lib/session";
@@ -7,7 +7,7 @@ import { DeleteChangeTemplateButton } from "./delete-change-template-button";
 
 export default async function AdminChangeTemplatesPage() {
   const session = await requireSession();
-  const role = (session.user as { role?: string }).role ?? "requester";
+  const role = session.user.role;
   if (role !== "admin") {
     return <p className="text-red-600">Admin only.</p>;
   }

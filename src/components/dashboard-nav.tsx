@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 
 type Role = "requester" | "approver" | "admin";
@@ -11,7 +12,7 @@ type NavItem = {
 };
 
 const baseItems: NavItem[] = [
-  { href: "/", label: "Home" },
+  { href: "/home", label: "Home" },
   { href: "/requests/new", label: "New request" },
   { href: "/changes", label: "Change releases" },
   { href: "/changes/new", label: "New change" },
@@ -24,15 +25,18 @@ const adminItems: NavItem[] = [
   { href: "/admin/change-templates", label: "Change templates" },
   { href: "/admin/routing", label: "Routing" },
   { href: "/admin/users", label: "Users" },
+  { href: "/admin/invites", label: "Invites" },
   { href: "/admin/ai", label: "AI" },
   { href: "/admin/api-keys", label: "API keys" },
+  { href: "/admin/billing", label: "Billing" },
   { href: "/admin/setup-status", label: "Setup status" },
   { href: "/admin/audit-export", label: "Audit export" },
   { href: "/admin/integrations", label: "Integrations" },
+  { href: "/analytics", label: "Analytics" },
 ];
 
 function matchesPath(pathname: string, href: string): boolean {
-  if (href === "/") return pathname === "/";
+  if (href === "/home") return pathname === "/home";
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -55,6 +59,34 @@ function NavLink({ href, label }: NavItem) {
 }
 
 export function DashboardNav({ role }: { role: Role }) {
+  const [adminOpen, setAdminOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
+
+  // Close dropdown when navigating
+  useEffect(() => {
+    setAdminOpen(false);
+  }, [pathname]);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!adminOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setAdminOpen(false);
+      }
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setAdminOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [adminOpen]);
+
   return (
     <nav aria-label="Primary" className="flex flex-wrap items-center gap-1 text-sm">
       {baseItems.map((item) => (
@@ -63,21 +95,30 @@ export function DashboardNav({ role }: { role: Role }) {
       {(role === "approver" || role === "admin") &&
         approverItems.map((item) => <NavLink key={item.href} {...item} />)}
       {role === "admin" && (
-        <details className="relative">
-          <summary
-            aria-label="Open admin navigation links"
-            className="cursor-pointer list-none rounded-md px-2 py-1 text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+        <div className="relative" ref={dropdownRef}>
+          <button
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded={adminOpen}
+            onClick={() => setAdminOpen((o) => !o)}
+            className="rounded-md px-2 py-1 text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
           >
             Admin
-          </summary>
-          <div className="absolute left-0 top-8 z-20 w-52 rounded-lg border border-zinc-200 bg-white p-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
-            {adminItems.map((item) => (
-              <div key={item.href}>
-                <NavLink {...item} />
-              </div>
-            ))}
-          </div>
-        </details>
+          </button>
+          {adminOpen && (
+            <div
+              role="menu"
+              aria-label="Admin navigation"
+              className="absolute left-0 top-8 z-20 w-52 rounded-lg border border-zinc-200 bg-white p-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+            >
+              {adminItems.map((item) => (
+                <div key={item.href} role="menuitem">
+                  <NavLink {...item} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </nav>
   );

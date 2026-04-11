@@ -1,4 +1,4 @@
-import { and, count, eq, isNull } from "drizzle-orm";
+﻿import { and, count, eq, isNull } from "drizzle-orm";
 import Link from "next/link";
 import { db } from "@/db";
 import {
@@ -44,7 +44,7 @@ function Row({
 
 export default async function AdminSetupStatusPage() {
   const session = await requireSession();
-  const role = (session.user as { role?: string }).role ?? "requester";
+  const role = session.user.role;
   if (role !== "admin") {
     return <p className="text-red-600">Admin only.</p>;
   }

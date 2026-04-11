@@ -5,6 +5,7 @@ import { request as requestTable, requestType, user } from "@/db/schema";
 import { recordAuditEvent } from "@/server/audit";
 import { resolveApproverUserIds } from "@/server/approval-routing";
 import { evaluatePolicyOrThrow } from "@/server/policy-engine";
+import { triageRequestAsync } from "@/server/ai/triage";
 import { deliverOrgWebhook } from "@/server/webhooks";
 import { getPublicAppUrl } from "@/lib/env";
 import { sendRequestCreatedNotifications } from "@/server/notifications/request-created";
@@ -16,6 +17,8 @@ export async function createRequestCore(input: {
   requestTypeId: string;
   payload: Record<string, unknown>;
   typeSlug: string;
+  typeTitle: string;
+  typeRiskDefaults: unknown;
   auditAction: string;
   auditActorId: string | null;
   auditMetadata?: Record<string, unknown>;
@@ -96,6 +99,15 @@ export async function createRequestCore(input: {
     requesterManagerUserId: requester?.managerUserId ?? null,
     approverUserIds: approverIds,
     reviewUrl,
+  });
+
+  void triageRequestAsync({
+    requestId: id,
+    organizationId: input.organizationId,
+    requestTypeTitle: input.typeTitle,
+    requestTypeSlug: input.typeSlug,
+    riskDefaults: input.typeRiskDefaults,
+    payload: input.payload,
   });
 
   return { id };

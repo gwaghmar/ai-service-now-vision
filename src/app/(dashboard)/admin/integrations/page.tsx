@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+﻿import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { organization } from "@/db/schema";
 import { requireSession } from "@/lib/session";
@@ -6,7 +6,7 @@ import { IntegrationsForm } from "./integrations-form";
 
 export default async function AdminIntegrationsPage() {
   const session = await requireSession();
-  const role = (session.user as { role?: string }).role ?? "requester";
+  const role = session.user.role;
   if (role !== "admin") {
     return <p className="text-red-600">Admin only.</p>;
   }

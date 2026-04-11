@@ -1,10 +1,12 @@
 "use client";
 
 import { useId, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   adminCreateRequestType,
   adminUpdateRequestType,
 } from "@/app/actions/admin";
+import { useToast } from "@/components/toast";
 
 type Mode = "create" | "edit";
 
@@ -36,6 +38,8 @@ export function RequestTypeForm(props: {
   );
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const router = useRouter();
+  const { toast } = useToast();
   const uid = useId();
   const idSlug = `${uid}-slug`;
   const idTitle = `${uid}-title`;
@@ -71,9 +75,12 @@ export function RequestTypeForm(props: {
               riskDefaultsJson,
             });
           }
-          window.location.reload();
+          const verb = props.mode === "create" ? "created" : "updated";
+          toast(`Request type ${verb}`, "success");
+          router.refresh();
         } catch (err) {
           setError(err instanceof Error ? err.message : "Failed");
+          toast(err instanceof Error ? err.message : "Save failed", "error");
           setPending(false);
         }
       }}

@@ -34,7 +34,7 @@ export async function POST(req: Request) {
     return new Response("messages must be an array", { status: 400 });
   }
   try {
-    assertAiRequestGuard({
+    await assertAiRequestGuard({
       req,
       organizationId: orgId,
       userId: session.user.id,

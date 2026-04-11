@@ -1,10 +1,10 @@
-import { requireSession } from "@/lib/session";
+﻿import { requireSession } from "@/lib/session";
 import { getOrgAiSettingsMasked } from "@/app/actions/ai-org";
 import { AiSettingsForm } from "./ai-settings-form";
 
 export default async function AdminAiPage() {
   const session = await requireSession();
-  const role = (session.user as { role?: string }).role ?? "requester";
+  const role = session.user.role;
   if (role !== "admin") {
     return <p className="text-red-600">Admin only.</p>;
   }

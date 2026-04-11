@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, or } from "drizzle-orm";
+﻿import { and, asc, eq, isNull, or } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import {
@@ -11,7 +11,7 @@ import { RoutingAdminClient } from "./routing-client";
 
 export default async function AdminRoutingPage() {
   const session = await requireSession();
-  const role = (session.user as { role?: string }).role ?? "requester";
+  const role = session.user.role;
   if (role !== "admin") {
     redirect("/");
   }

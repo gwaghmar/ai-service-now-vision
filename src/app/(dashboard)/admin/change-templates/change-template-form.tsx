@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   adminCreateChangeTemplate,
   adminUpdateChangeTemplate,
 } from "@/app/actions/admin";
+import { useToast } from "@/components/toast";
 
 type Mode = "create" | "edit";
 
@@ -30,6 +32,8 @@ export function ChangeTemplateForm(props: {
   );
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const router = useRouter();
+  const { toast } = useToast();
 
   return (
     <form
@@ -55,9 +59,12 @@ export function ChangeTemplateForm(props: {
               fieldSchemaJson,
             });
           }
-          window.location.reload();
+          const verb = props.mode === "create" ? "created" : "updated";
+          toast(`Change template ${verb}`, "success");
+          router.refresh();
         } catch (err) {
           setError(err instanceof Error ? err.message : "Failed");
+          toast(err instanceof Error ? err.message : "Save failed", "error");
           setPending(false);
         }
       }}

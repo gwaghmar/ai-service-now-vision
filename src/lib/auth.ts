@@ -108,6 +108,18 @@ export const auth = betterAuth({
   },
   emailAndPassword: {
     enabled: true,
+    sendResetPassword: async ({ user, url }) => {
+      const { sendTransactionalEmail } = await import(
+        "@/server/email/send-email"
+      );
+      await sendTransactionalEmail({
+        to: user.email,
+        subject: "Reset your password",
+        html: `<p>Click the link below to reset your password. This link expires in 1 hour.</p>
+<p><a href="${url}">${url}</a></p>
+<p>If you did not request a password reset, you can ignore this email.</p>`,
+      });
+    },
   },
   user: {
     additionalFields: {
@@ -123,5 +135,32 @@ export const auth = betterAuth({
         input: false,
       },
     },
+  },
+  socialProviders: {
+    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
+      ? {
+          google: {
+            clientId: process.env.GOOGLE_CLIENT_ID,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+          },
+        }
+      : {}),
+    ...(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET
+      ? {
+          github: {
+            clientId: process.env.GITHUB_CLIENT_ID,
+            clientSecret: process.env.GITHUB_CLIENT_SECRET,
+          },
+        }
+      : {}),
+    ...(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET
+      ? {
+          microsoft: {
+            clientId: process.env.MICROSOFT_CLIENT_ID,
+            clientSecret: process.env.MICROSOFT_CLIENT_SECRET,
+            tenantId: process.env.MICROSOFT_TENANT_ID,
+          },
+        }
+      : {}),
   },
 });

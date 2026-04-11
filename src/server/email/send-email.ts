@@ -1,12 +1,5 @@
-import { eq } from "drizzle-orm";
-import { db } from "@/db";
-import { organizationEmailSettings } from "@/db/schema";
-
 /**
  * Transactional email via Resend HTTP API, or console fallback in dev.
- * When `organizationId` is set, org-level `organization_email_settings` may
- * select a future provider (Microsoft Graph / Gmail); unimplemented providers
- * fall back to Resend/env with a console warning.
  */
 export async function sendTransactionalEmail(input: {
   organizationId?: string | null;
@@ -15,24 +8,6 @@ export async function sendTransactionalEmail(input: {
   html: string;
   text?: string;
 }): Promise<{ ok: boolean; error?: string }> {
-  if (input.organizationId) {
-    const [row] = await db
-      .select()
-      .from(organizationEmailSettings)
-      .where(
-        eq(
-          organizationEmailSettings.organizationId,
-          input.organizationId,
-        ),
-      )
-      .limit(1);
-    if (row?.provider === "graph" || row?.provider === "gmail") {
-      console.warn(
-        `[email] Org ${input.organizationId} uses provider=${row.provider} — not implemented; using Resend/env fallback.`,
-      );
-    }
-  }
-
   const key = process.env.RESEND_API_KEY?.trim();
   const from =
     process.env.EMAIL_FROM?.trim() || "Governance <onboarding@resend.dev>";

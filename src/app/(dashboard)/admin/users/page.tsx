@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+﻿import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { user } from "@/db/schema";
 import { requireSession } from "@/lib/session";
@@ -6,7 +6,7 @@ import { UserRoleForm } from "./user-role-form";
 
 export default async function AdminUsersPage() {
   const session = await requireSession();
-  const role = (session.user as { role?: string }).role ?? "requester";
+  const role = session.user.role;
   if (role !== "admin") {
     return <p className="text-red-600">Admin only.</p>;
   }

@@ -47,7 +47,7 @@ export async function POST(req: Request) {
   );
 
   const ip = getClientIp(req);
-  const ipCheck = rateLimitAllow(`agent-v1:ip:${ip}`, ipLimit, WINDOW_MS);
+  const ipCheck = await rateLimitAllow(`agent-v1:ip:${ip}`, ipLimit, WINDOW_MS);
   if (!ipCheck.ok) {
     return tooMany(ipCheck.retryAfterMs);
   }
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
   const authHeader = req.headers.get("authorization");
   const parsedBearer = parseApiKeyLookupId(authHeader);
   if (parsedBearer) {
-    const keyCheck = rateLimitAllow(
+    const keyCheck = await rateLimitAllow(
       `agent-v1:lk:${parsedBearer.lookupId}`,
       keyLimit,
       WINDOW_MS,
@@ -134,6 +134,8 @@ export async function POST(req: Request) {
       requestTypeId: type.id,
       payload: payloadCheck.data as Record<string, unknown>,
       typeSlug: type.slug,
+      typeTitle: type.title,
+      typeRiskDefaults: type.riskDefaults,
       auditAction: "request_created_agent_api",
       auditActorId: null,
       auditMetadata: { apiKeyId: ctx.apiKeyId },

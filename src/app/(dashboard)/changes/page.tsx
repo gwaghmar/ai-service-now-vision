@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { and, desc, eq, lt } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -31,7 +31,7 @@ export default async function ChangesListPage({
   const session = await requireSession();
   const orgId = session.user.organizationId;
   const uid = session.user.id;
-  const role = (session.user as { role?: string }).role ?? "requester";
+  const role = session.user.role;
   const canSeeAll = role === "approver" || role === "admin";
 
   const { view: viewParam, before } = await searchParams;
@@ -147,7 +147,7 @@ export default async function ChangesListPage({
                       {templateTitle}
                       {assigneeEmail ? ` · Assignee: ${assigneeEmail}` : ""}
                       {ticket.updatedAt
-                        ? ` · Updated ${ticket.updatedAt.toISOString().slice(0, 10)}`
+                        ? ` · Updated ${new Date(ticket.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`
                         : ""}
                     </p>
                   </Link>

@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+﻿import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { apiKey } from "@/db/schema";
 import { requireSession } from "@/lib/session";
@@ -7,7 +7,7 @@ import { RevokeApiKeyButton } from "./revoke-button";
 
 export default async function AdminApiKeysPage() {
   const session = await requireSession();
-  const role = (session.user as { role?: string }).role ?? "requester";
+  const role = session.user.role;
   if (role !== "admin") {
     return <p className="text-red-600">Admin only.</p>;
   }
@@ -67,11 +67,22 @@ export default async function AdminApiKeysPage() {
                 <span className="font-medium">{k.name}</span>
                 <span className="ml-2 text-xs text-zinc-500">
                   …{k.lookupId.slice(0, 6)} · created{" "}
-                  {k.createdAt?.toISOString?.() ?? ""}
+                  {k.createdAt
+                    ? new Date(k.createdAt).toLocaleDateString(undefined, {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                      })
+                    : ""}
                 </span>
                 {k.revokedAt && (
                   <span className="ml-2 text-xs text-red-600">
-                    revoked {k.revokedAt.toISOString()}
+                    revoked{" "}
+                    {new Date(k.revokedAt).toLocaleDateString(undefined, {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    })}
                   </span>
                 )}
               </div>

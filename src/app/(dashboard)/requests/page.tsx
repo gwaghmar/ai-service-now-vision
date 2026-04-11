@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+﻿import { Suspense } from "react";
 import { and, desc, eq, inArray, lt } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -28,7 +28,7 @@ export default async function RequestsHubPage({
     return <p className="text-red-600">Your account has no organization.</p>;
   }
 
-  const role = (session.user as { role?: string }).role ?? "requester";
+  const role = session.user.role;
   const isAdmin = role === "admin";
 
   const catalog = await fetchOrgCatalogTiles(orgId);

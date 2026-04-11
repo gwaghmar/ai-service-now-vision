@@ -97,7 +97,7 @@ export function SignUpForm() {
                 return;
               }
             }
-            router.push("/");
+            router.push("/home");
             router.refresh();
           }}
         >

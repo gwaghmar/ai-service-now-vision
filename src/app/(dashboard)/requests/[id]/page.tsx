@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { and, asc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
@@ -14,6 +14,8 @@ import { requestStatusLabel } from "@/lib/status-labels";
 import { isApproverAllowedForRequest } from "@/server/approval-routing";
 import { RequestVisitTracker } from "@/components/request-visit-tracker";
 import { ApproverSummaryPanel } from "@/components/approver-summary-panel";
+import { TriageBadge } from "@/components/triage-badge";
+import { ApproverRecommendation } from "@/components/approver-recommendation";
 import { ApprovalPanel } from "./approval-panel";
 import { NeedsInfoResubmit } from "./needs-info-resubmit";
 
@@ -64,7 +66,7 @@ export default async function RequestDetailPage({
     managerEmail = mgr?.email ?? null;
   }
 
-  const role = (session.user as { role?: string }).role ?? "requester";
+  const role = session.user.role;
   const isRequester = row.request.requesterId === session.user.id;
   const isApprover = role === "approver" || role === "admin";
   const awaitingDecision =
@@ -80,7 +82,7 @@ export default async function RequestDetailPage({
         assignedApproverId: row.request.assignedApproverId,
       }));
 
-  const canView = isRequester || isApprover || role === "admin";
+  const canView = isRequester || isApprover;
   if (!canView) notFound();
 
   const canResubmitInfo =
@@ -124,6 +126,12 @@ export default async function RequestDetailPage({
             {requestStatusLabel(row.request.status)}
           </span>
           <span className="text-sm text-zinc-500">{row.typeTitle}</span>
+          {row.request.aiTriageRisk && (
+            <TriageBadge
+              risk={row.request.aiTriageRisk}
+              reason={row.request.aiTriageReason}
+            />
+          )}
         </div>
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
           Requester: {row.requesterName} ({row.requesterEmail})
@@ -155,6 +163,11 @@ export default async function RequestDetailPage({
 
       {canApprove && (
         <div className="space-y-4">
+          <ApproverRecommendation
+            requestId={id}
+            organizationId={orgId}
+            requestTypeId={row.request.requestTypeId}
+          />
           <ApproverSummaryPanel requestId={id} />
           <ApprovalPanel requestId={id} />
         </div>
@@ -177,7 +190,9 @@ export default async function RequestDetailPage({
                 key={d.id}
                 className="rounded-lg border border-zinc-200 px-3 py-2 dark:border-zinc-800"
               >
-                <span className="font-medium">{d.decision}</span>
+                <span className="font-medium capitalize">
+                  {d.approverId ? d.decision : `${d.decision} (AI auto-approved)`}
+                </span>
                 {d.comment && (
                   <span className="text-zinc-600 dark:text-zinc-400">
                     {" "}
@@ -195,12 +210,28 @@ export default async function RequestDetailPage({
         <ul className="mt-2 divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
           {events.map((e) => (
             <li key={e.id} className="px-3 py-2 text-sm">
-              <span className="text-xs text-zinc-500">
-                {e.createdAt?.toISOString?.() ?? ""}
-              </span>
+              <time
+                dateTime={e.createdAt?.toISOString?.() ?? undefined}
+                title={e.createdAt ? new Date(e.createdAt).toLocaleString() : ""}
+                className="text-xs text-zinc-500"
+              >
+                {e.createdAt
+                  ? new Date(e.createdAt).toLocaleString(undefined, {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
+                  : ""}
+              </time>
               <div className="font-medium">{e.action}</div>
               {e.metadata && (
-                <pre className="mt-1 max-h-32 overflow-auto text-xs text-zinc-600 dark:text-zinc-400">
+                <pre
+                  tabIndex={0}
+                  aria-label="Event metadata"
+                  className="mt-1 max-h-32 overflow-auto text-xs text-zinc-600 dark:text-zinc-400"
+                >
                   {JSON.stringify(e.metadata, null, 2)}
                 </pre>
               )}

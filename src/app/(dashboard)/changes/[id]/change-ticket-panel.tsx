@@ -1,12 +1,14 @@
 "use client";
 
 import { useId, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   advanceChangeTicketStageAction,
   moveChangeTicketToOnDeckAction,
   updateChangeTicketAssigneeAction,
   updateChangeTicketDraftAction,
 } from "@/app/actions/change-tickets";
+import { useToast } from "@/components/toast";
 import {
   parseFieldSchema,
   type FieldSchemaJson,
@@ -50,6 +52,8 @@ export function ChangeTicketPanel({
   canEditDraft: boolean;
   canUpdateAssignee: boolean;
 }) {
+  const router = useRouter();
+  const { toast } = useToast();
   const [title, setTitle] = useState(initialTitle);
   const [assigneeId, setAssigneeId] = useState(initialAssignee ?? "");
   const [comment, setComment] = useState("");
@@ -71,8 +75,9 @@ export function ChangeTicketPanel({
 
   const stageIndex = CHANGE_TICKET_STAGES.indexOf(stage);
 
-  async function reload() {
-    window.location.reload();
+  async function reload(message?: string) {
+    if (message) toast(message, "success");
+    router.refresh();
   }
 
   return (
@@ -130,7 +135,7 @@ export function ChangeTicketPanel({
                     ticketId,
                     assignedUserId: assigneeId,
                   });
-                  await reload();
+                  await reload("Assignee saved");
                 } catch (e) {
                   setError(e instanceof Error ? e.message : "Failed");
                   setPending(false);
@@ -171,7 +176,7 @@ export function ChangeTicketPanel({
                   setPending(false);
                   return;
                 }
-                await reload();
+                await reload("Draft saved");
               } catch (err) {
                 setError(err instanceof Error ? err.message : "Failed");
                 setPending(false);
@@ -273,7 +278,7 @@ export function ChangeTicketPanel({
                 setPending(true);
                 try {
                   await moveChangeTicketToOnDeckAction({ ticketId });
-                  await reload();
+                  await reload("Moved to On deck");
                 } catch (e) {
                   setError(e instanceof Error ? e.message : "Failed");
                   setPending(false);
@@ -297,7 +302,7 @@ export function ChangeTicketPanel({
                     ticketId,
                     comment: comment || undefined,
                   });
-                  await reload();
+                  await reload(advanceLabel ?? "Stage advanced");
                 } catch (e) {
                   setError(e instanceof Error ? e.message : "Failed");
                   setPending(false);

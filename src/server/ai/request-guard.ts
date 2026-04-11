@@ -14,7 +14,7 @@ function fail(message: string, status: number): never {
   throw err;
 }
 
-export function assertAiRequestGuard(input: {
+export async function assertAiRequestGuard(input: {
   req: Request;
   organizationId: string;
   userId: string;
@@ -44,7 +44,7 @@ export function assertAiRequestGuard(input: {
     [orgKey, AI_LIMIT_PER_ORG],
     [ipKey, AI_LIMIT_PER_IP],
   ] as const) {
-    const allowed = rateLimitAllow(key, limit, AI_WINDOW_MS);
+    const allowed = await rateLimitAllow(key, limit, AI_WINDOW_MS);
     if (!allowed.ok) {
       fail("Rate limit exceeded. Please retry shortly.", 429);
     }

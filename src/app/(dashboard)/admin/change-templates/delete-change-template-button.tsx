@@ -1,7 +1,9 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { adminDeleteChangeTemplate } from "@/app/actions/admin";
+import { useToast } from "@/components/toast";
 
 export function DeleteChangeTemplateButton({
   id,
@@ -10,6 +12,8 @@ export function DeleteChangeTemplateButton({
   id: string;
   slug: string;
 }) {
+  const router = useRouter();
+  const { toast } = useToast();
   const [pending, setPending] = useState(false);
   return (
     <button
@@ -18,7 +22,7 @@ export function DeleteChangeTemplateButton({
       onClick={async () => {
         if (
           !confirm(
-            `Delete change template “${slug}”? Only allowed if no tickets use it.`,
+            `Delete change template "${slug}"? Only allowed if no tickets use it.`,
           )
         ) {
           return;
@@ -26,9 +30,10 @@ export function DeleteChangeTemplateButton({
         setPending(true);
         try {
           await adminDeleteChangeTemplate({ id });
-          window.location.reload();
+          toast(`Template "${slug}" deleted`, "success");
+          router.refresh();
         } catch (e) {
-          alert(e instanceof Error ? e.message : "Delete failed");
+          toast(e instanceof Error ? e.message : "Delete failed", "error");
           setPending(false);
         }
       }}

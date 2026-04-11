@@ -1,9 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { adminRevokeApiKey } from "@/app/actions/admin";
+import { useToast } from "@/components/toast";
 
 export function RevokeApiKeyButton({ id }: { id: string }) {
+  const router = useRouter();
+  const { toast } = useToast();
   const [pending, setPending] = useState(false);
   return (
     <button
@@ -14,9 +18,14 @@ export function RevokeApiKeyButton({ id }: { id: string }) {
           return;
         }
         setPending(true);
-        await adminRevokeApiKey({ id });
-        setPending(false);
-        window.location.reload();
+        try {
+          await adminRevokeApiKey({ id });
+          toast("API key revoked", "success");
+          router.refresh();
+        } catch (e) {
+          toast(e instanceof Error ? e.message : "Revoke failed", "error");
+          setPending(false);
+        }
       }}
       className="text-xs text-red-600 underline disabled:opacity-50"
     >

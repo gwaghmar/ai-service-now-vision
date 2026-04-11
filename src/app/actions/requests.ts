@@ -82,6 +82,8 @@ export async function createRequestAction(input: {
       requestTypeId: type.id,
       payload: parsed.data as Record<string, unknown>,
       typeSlug: type.slug,
+      typeTitle: type.title,
+      typeRiskDefaults: type.riskDefaults,
       auditAction: "request_created",
       auditActorId: requesterId,
     });

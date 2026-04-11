@@ -16,13 +16,13 @@ describe("getClientIp", () => {
 });
 
 describe("rateLimitAllow", () => {
-  it("allows then blocks within the same window", () => {
+  it("allows then blocks within the same window", async () => {
     const key = `t-${Math.random()}`;
     const limit = 2;
     const windowMs = 60_000;
-    expect(rateLimitAllow(key, limit, windowMs)).toEqual({ ok: true });
-    expect(rateLimitAllow(key, limit, windowMs)).toEqual({ ok: true });
-    const last = rateLimitAllow(key, limit, windowMs);
+    expect(await rateLimitAllow(key, limit, windowMs)).toEqual({ ok: true });
+    expect(await rateLimitAllow(key, limit, windowMs)).toEqual({ ok: true });
+    const last = await rateLimitAllow(key, limit, windowMs);
     expect(last.ok).toBe(false);
     if (!last.ok) {
       expect(last.retryAfterMs).toBeGreaterThan(0);

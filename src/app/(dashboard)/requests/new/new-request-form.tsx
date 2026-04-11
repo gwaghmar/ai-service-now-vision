@@ -5,6 +5,10 @@ import { useEffect, useMemo, useId, useState } from "react";
 import { suggestRequestPayloadAction } from "@/app/actions/ai-request-helper";
 import { createRequestAction } from "@/app/actions/requests";
 import {
+  getSimilarRequestsAction,
+  type SimilarRequest,
+} from "@/app/actions/ai-triage";
+import {
   parseFieldSchema,
   type FieldSchemaJson,
 } from "@/lib/request-schemas";
@@ -51,6 +55,8 @@ export function NewRequestForm({
   const [suggestHint, setSuggestHint] = useState("");
   const [suggestMsg, setSuggestMsg] = useState<string | null>(null);
   const [suggestPending, setSuggestPending] = useState(false);
+  const [similarRequests, setSimilarRequests] = useState<SimilarRequest[]>([]);
+  const [similarLoading, setSimilarLoading] = useState(false);
 
   const selected = types.find((t) => t.id === typeId) ?? types[0];
   const schema = useMemo((): FieldSchemaJson | null => {
@@ -66,6 +72,18 @@ export function NewRequestForm({
     setFieldValues(emptyValuesForSchema(schema));
     setSuggestMsg(null);
   }, [typeId, schema]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setSimilarRequests([]);
+    setSimilarLoading(true);
+    getSimilarRequestsAction(typeId).then((res) => {
+      if (cancelled) return;
+      setSimilarLoading(false);
+      if (res.ok) setSimilarRequests(res.requests);
+    });
+    return () => { cancelled = true; };
+  }, [typeId]);
 
   const risk = selected?.riskDefaults as Record<string, unknown> | null;
   const formId = useId();
@@ -234,53 +252,87 @@ export function NewRequestForm({
               </div>
             </div>
 
-            {schema.fields.map((f) => (
+            {schema.fields.map((f) => {
+              const inputClass =
+                "mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950";
+              const isRequired = f.required !== false;
+              const sharedProps = {
+                id: `${formId}-field-${f.key}`,
+                name: f.key,
+                required: isRequired,
+                "aria-invalid": Boolean(submitError),
+                "aria-describedby": submitError ? submitErrorId : undefined,
+                className: inputClass,
+              };
+              return (
               <div key={f.key}>
-                <label
-                  htmlFor={`${formId}-field-${f.key}`}
-                  className="text-xs font-medium text-zinc-600 dark:text-zinc-400"
-                >
-                  {f.label}
-                  {f.required !== false ? " *" : ""}
-                </label>
-                {f.type === "textarea" ? (
-                  <textarea
-                    id={`${formId}-field-${f.key}`}
-                    name={f.key}
-                    required={f.required !== false}
-                    rows={4}
-                    placeholder={f.placeholder}
-                    value={fieldValues[f.key] ?? ""}
-                    onChange={(e) =>
-                      setFieldValues((p) => ({
-                        ...p,
-                        [f.key]: e.target.value,
-                      }))
-                    }
-                    aria-invalid={Boolean(submitError)}
-                    aria-describedby={submitError ? submitErrorId : undefined}
-                    className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
-                  />
+                {f.type === "boolean" ? (
+                  <label
+                    htmlFor={`${formId}-field-${f.key}`}
+                    className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400"
+                  >
+                    <input
+                      {...sharedProps}
+                      type="checkbox"
+                      className="h-4 w-4 rounded"
+                      checked={fieldValues[f.key] === "true"}
+                      onChange={(e) =>
+                        setFieldValues((p) => ({ ...p, [f.key]: e.target.checked ? "true" : "false" }))
+                      }
+                    />
+                    {f.label}
+                  </label>
                 ) : (
-                  <input
-                    id={`${formId}-field-${f.key}`}
-                    name={f.key}
-                    required={f.required !== false}
-                    placeholder={f.placeholder}
-                    value={fieldValues[f.key] ?? ""}
-                    onChange={(e) =>
-                      setFieldValues((p) => ({
-                        ...p,
-                        [f.key]: e.target.value,
-                      }))
-                    }
-                    aria-invalid={Boolean(submitError)}
-                    aria-describedby={submitError ? submitErrorId : undefined}
-                    className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
-                  />
+                  <>
+                    <label
+                      htmlFor={`${formId}-field-${f.key}`}
+                      className="text-xs font-medium text-zinc-600 dark:text-zinc-400"
+                    >
+                      {f.label}
+                      {isRequired ? " *" : ""}
+                    </label>
+                    {f.type === "textarea" ? (
+                      <textarea
+                        {...sharedProps}
+                        rows={4}
+                        placeholder={f.placeholder}
+                        value={fieldValues[f.key] ?? ""}
+                        onChange={(e) =>
+                          setFieldValues((p) => ({ ...p, [f.key]: e.target.value }))
+                        }
+                      />
+                    ) : f.type === "select" ? (
+                      <select
+                        {...sharedProps}
+                        value={fieldValues[f.key] ?? ""}
+                        onChange={(e) =>
+                          setFieldValues((p) => ({ ...p, [f.key]: e.target.value }))
+                        }
+                      >
+                        <option value="">Select…</option>
+                        {(f.options ?? []).map((opt) => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        {...sharedProps}
+                        type={f.type === "number" ? "number" : f.type === "date" ? "date" : "text"}
+                        placeholder={f.placeholder}
+                        min={f.min}
+                        max={f.max}
+                        value={fieldValues[f.key] ?? ""}
+                        onChange={(e) =>
+                          setFieldValues((p) => ({ ...p, [f.key]: e.target.value }))
+                        }
+                      />
+                    )}
+                  </>
                 )}
               </div>
-            ))}
+              );
+            })
+            }
             {submitError && (
               <p id={submitErrorId} className="text-sm text-red-600" role="alert">
                 {submitError}
@@ -320,6 +372,46 @@ export function NewRequestForm({
                 </dd>
               </div>
             </dl>
+
+            {/* Similar requests */}
+            <div className="mt-6">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                Recent similar requests
+              </h2>
+              {similarLoading ? (
+                <p className="mt-2 text-xs text-zinc-400">Loading…</p>
+              ) : similarRequests.length === 0 ? (
+                <p className="mt-2 text-xs text-zinc-400">None found.</p>
+              ) : (
+                <ul className="mt-2 space-y-2">
+                  {similarRequests.map((r) => (
+                    <li key={r.id}>
+                      <Link
+                        href={`/requests/${r.id}`}
+                        className="block rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2 hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-600"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="rounded-full bg-zinc-200 px-1.5 py-0.5 text-xs dark:bg-zinc-700">
+                            {r.status.replace(/_/g, " ")}
+                          </span>
+                          <span className="text-xs text-zinc-400">
+                            {r.createdAt
+                              ? new Date(r.createdAt).toLocaleDateString(
+                                  undefined,
+                                  { month: "short", day: "numeric" },
+                                )
+                              : ""}
+                          </span>
+                        </div>
+                        <p className="mt-1 truncate text-xs text-zinc-600 dark:text-zinc-400">
+                          {r.payloadSummary}
+                        </p>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </aside>
         </form>
       )}

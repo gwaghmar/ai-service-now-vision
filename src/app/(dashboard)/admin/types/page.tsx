@@ -1,4 +1,4 @@
-import { count, desc, eq } from "drizzle-orm";
+﻿import { count, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { request as requestTable, requestType } from "@/db/schema";
 import { requireSession } from "@/lib/session";
@@ -8,7 +8,7 @@ import { RequestTypeForm } from "./request-type-form";
 
 export default async function AdminTypesPage() {
   const session = await requireSession();
-  const role = (session.user as { role?: string }).role ?? "requester";
+  const role = session.user.role;
   if (role !== "admin") {
     return <p className="text-red-600">Admin only.</p>;
   }

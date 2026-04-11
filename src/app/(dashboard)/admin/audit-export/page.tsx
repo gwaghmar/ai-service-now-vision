@@ -1,9 +1,9 @@
-import { requireSession } from "@/lib/session";
+﻿import { requireSession } from "@/lib/session";
 import { AuditExportClient } from "./audit-export-client";
 
 export default async function AuditExportPage() {
   const session = await requireSession();
-  const role = (session.user as { role?: string }).role ?? "requester";
+  const role = session.user.role;
   if (role !== "admin") {
     return <p className="text-red-600">Admin only.</p>;
   }

@@ -25,7 +25,7 @@ describe("verifySlackRequestSignature", () => {
     const ts = "1355517523";
     const sig = slackSig(secret, ts, body);
     expect(
-      verifySlackRequestSignature(secret, "payload=tampered", ts, sig, ts),
+      verifySlackRequestSignature(secret, "payload=tampered", ts, sig, Number(ts)),
     ).toBe(false);
   });
 

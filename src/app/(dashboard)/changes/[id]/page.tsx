@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { and, asc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
@@ -38,8 +38,7 @@ export default async function ChangeTicketDetailPage({
   if (!orgId) notFound();
 
   const uid = session.user.id;
-  const role = ((session.user as { role?: string }).role ??
-    "requester") as "requester" | "approver" | "admin";
+  const role = session.user.role as "requester" | "approver" | "admin";
 
   const [row] = await db
     .select({
@@ -162,12 +161,28 @@ export default async function ChangeTicketDetailPage({
         <ul className="mt-2 divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
           {events.map((e) => (
             <li key={e.id} className="px-3 py-2 text-sm">
-              <span className="text-xs text-zinc-500">
-                {e.createdAt?.toISOString?.() ?? ""}
-              </span>
+              <time
+                dateTime={e.createdAt?.toISOString?.() ?? undefined}
+                title={e.createdAt ? new Date(e.createdAt).toLocaleString() : ""}
+                className="text-xs text-zinc-500"
+              >
+                {e.createdAt
+                  ? new Date(e.createdAt).toLocaleString(undefined, {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
+                  : ""}
+              </time>
               <div className="font-medium">{e.action}</div>
               {e.metadata && (
-                <pre className="mt-1 max-h-32 overflow-auto text-xs text-zinc-600 dark:text-zinc-400">
+                <pre
+                  tabIndex={0}
+                  aria-label="Event metadata"
+                  className="mt-1 max-h-32 overflow-auto text-xs text-zinc-600 dark:text-zinc-400"
+                >
                   {JSON.stringify(e.metadata, null, 2)}
                 </pre>
               )}

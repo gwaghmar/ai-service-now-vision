@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deploy Diagram</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;min-height:100%;background:#050608;font-family:'JetBrains Mono',monospace;overflow-x:hidden}
+  :root{
+    --green:#00ff87;--green-dim:#00c96a;--green-bg:rgba(0,255,135,0.07);
+    --red:#ff3d5a;--red-dim:#cc2040;--red-bg:rgba(255,61,90,0.07);
+    --amber:#ffaa00;--amber-bg:rgba(255,170,0,0.07);
+    --blue:#4d9fff;--blue-bg:rgba(77,159,255,0.07);
+    --grey:#8899bb;--grey-bg:rgba(136,153,187,0.06);
+    --border-green:rgba(0,255,135,0.25);
+    --border-red:rgba(255,61,90,0.25);
+    --border-amber:rgba(255,170,0,0.25);
+    --border-blue:rgba(77,159,255,0.2);
+    --border-grey:rgba(136,153,187,0.15);
+    --surface:#0a0d14;
+    --surface2:#0f1520;
+  }
+
+  .canvas{
+    width:1400px;
+    margin:0 auto;
+    padding:60px 40px 100px;
+    position:relative;
+  }
+
+  /* LEGEND */
+  .legend{
+    display:flex;gap:28px;justify-content:flex-end;margin-bottom:60px;
+    align-items:center;
+  }
+  .leg{display:flex;align-items:center;gap:8px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--grey)}
+  .leg-dot{width:10px;height:10px;border-radius:50%}
+
+  /* LAYER */
+  .layer{
+    display:grid;
+    gap:16px;
+    margin-bottom:40px;
+    position:relative;
+  }
+  .layer-label{
+    font-size:9px;letter-spacing:.25em;text-transform:uppercase;
+    color:#2a3550;margin-bottom:8px;padding-left:2px;
+    font-weight:600;
+  }
+
+  /* CONNECTOR LINES */
+  .connector{
+    width:2px;height:40px;
+    background:linear-gradient(to bottom,rgba(77,159,255,0.15),rgba(77,159,255,0.0));
+    margin:0 auto -40px;
+    position:relative;z-index:0;
+  }
+
+  /* NODE */
+  .node{
+    border-radius:10px;
+    padding:14px 18px;
+    display:flex;align-items:center;gap:12px;
+    position:relative;
+    transition:transform .15s;
+    cursor:default;
+  }
+  .node:hover{transform:translateY(-1px)}
+
+  .node.green{background:var(--green-bg);border:1px solid var(--border-green)}
+  .node.red{background:var(--red-bg);border:1px solid var(--border-red)}
+  .node.amber{background:var(--amber-bg);border:1px solid var(--border-amber)}
+  .node.blue{background:var(--blue-bg);border:1px solid var(--border-blue)}
+  .node.grey{background:var(--grey-bg);border:1px solid var(--border-grey)}
+
+  .node-icon{
+    width:34px;height:34px;
+    border-radius:7px;
+    display:flex;align-items:center;justify-content:center;
+    flex-shrink:0;
+  }
+  .node.green .node-icon{background:rgba(0,255,135,0.12)}
+  .node.red .node-icon{background:rgba(255,61,90,0.12)}
+  .node.amber .node-icon{background:rgba(255,170,0,0.12)}
+  .node.blue .node-icon{background:rgba(77,159,255,0.12)}
+  .node.grey .node-icon{background:rgba(136,153,187,0.08)}
+
+  .node-icon svg{width:18px;height:18px}
+  .node.green .node-icon svg{color:var(--green)}
+  .node.red .node-icon svg{color:var(--red)}
+  .node.amber .node-icon svg{color:var(--amber)}
+  .node.blue .node-icon svg{color:var(--blue)}
+  .node.grey .node-icon svg{color:var(--grey)}
+
+  .node-text{}
+  .node-name{font-size:12px;font-weight:600;letter-spacing:.03em}
+  .node.green .node-name{color:#c8fff0}
+  .node.red .node-name{color:#ffd0d8}
+  .node.amber .node-name{color:#ffe5aa}
+  .node.blue .node-name{color:#c5dfff}
+  .node.grey .node-name{color:#b0bdd0}
+
+  .node-sub{font-size:10px;margin-top:2px;opacity:.5;letter-spacing:.04em}
+  .node.green .node-sub{color:var(--green)}
+  .node.red .node-sub{color:var(--red)}
+  .node.amber .node-sub{color:var(--amber)}
+  .node.blue .node-sub{color:var(--blue)}
+  .node.grey .node-sub{color:var(--grey)}
+
+  .status-pip{
+    margin-left:auto;width:7px;height:7px;border-radius:50%;flex-shrink:0;
+  }
+  .green .status-pip{background:var(--green);box-shadow:0 0 6px var(--green)}
+  .red .status-pip{background:var(--red);box-shadow:0 0 6px var(--red)}
+  .amber .status-pip{background:var(--amber);box-shadow:0 0 6px var(--amber)}
+  .blue .status-pip{background:var(--blue)}
+  .grey .status-pip{background:var(--grey)}
+
+  /* GRID LAYOUTS */
+  .g2{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:1fr 1fr 1fr}
+  .g4{grid-template-columns:1fr 1fr 1fr 1fr}
+  .g5{grid-template-columns:1fr 1fr 1fr 1fr 1fr}
+  .g6{grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr}
+  .g1{grid-template-columns:1fr}
+
+  /* SECTION DIVIDER */
+  .section-row{
+    display:flex;align-items:center;gap:16px;margin:48px 0 20px;
+  }
+  .section-row .sr-line{flex:1;height:1px;background:rgba(255,255,255,0.04)}
+  .section-row .sr-label{
+    font-size:9px;letter-spacing:.3em;text-transform:uppercase;
+    color:#1e2840;font-weight:700;white-space:nowrap;
+  }
+
+  /* TOP HERO */
+  .hero{
+    text-align:center;margin-bottom:56px;
+  }
+  .hero-title{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:13px;letter-spacing:.4em;text-transform:uppercase;
+    color:#1e2d50;margin-bottom:4px;
+  }
+
+  /* FLOW ARROW */
+  .flow-arrow{
+    display:flex;align-items:center;justify-content:center;
+    height:32px;position:relative;
+  }
+  .flow-arrow::after{
+    content:'';
+    display:block;
+    width:0;height:0;
+    border-left:6px solid transparent;
+    border-right:6px solid transparent;
+    border-top:8px solid rgba(77,159,255,0.18);
+  }
+  .flow-arrow::before{
+    content:'';
+    position:absolute;
+    top:0;left:50%;transform:translateX(-50%);
+    width:1px;height:24px;
+    background:linear-gradient(to bottom,rgba(77,159,255,0.12),rgba(77,159,255,0.25));
+  }
+
+  /* BRACKET GROUPS */
+  .group-wrap{
+    border:1px solid rgba(255,255,255,0.035);
+    border-radius:14px;
+    padding:20px;
+    background:rgba(255,255,255,0.012);
+    margin-bottom:0;
+  }
+  .group-label{
+    font-size:8.5px;letter-spacing:.28em;text-transform:uppercase;
+    color:#1a243a;font-weight:700;margin-bottom:12px;
+  }
+
+  /* MISSING BADGE */
+  .missing-tag{
+    font-size:8px;letter-spacing:.12em;text-transform:uppercase;
+    background:rgba(255,61,90,0.15);color:var(--red);
+    padding:2px 7px;border-radius:4px;border:1px solid rgba(255,61,90,0.2);
+    margin-left:auto;flex-shrink:0;
+  }
+  .partial-tag{
+    font-size:8px;letter-spacing:.12em;text-transform:uppercase;
+    background:rgba(255,170,0,0.12);color:var(--amber);
+    padding:2px 7px;border-radius:4px;border:1px solid rgba(255,170,0,0.2);
+    margin-left:auto;flex-shrink:0;
+  }
+  .done-tag{
+    font-size:8px;letter-spacing:.12em;text-transform:uppercase;
+    background:rgba(0,255,135,0.08);color:var(--green);
+    padding:2px 7px;border-radius:4px;border:1px solid rgba(0,255,135,0.15);
+    margin-left:auto;flex-shrink:0;
+  }
+
+  /* GLOW BG */
+  .glow-top{
+    position:fixed;top:-200px;left:50%;transform:translateX(-50%);
+    width:800px;height:600px;
+    background:radial-gradient(ellipse at center,rgba(77,159,255,0.04) 0%,transparent 70%);
+    pointer-events:none;
+  }
+</style>
+</head>
+<body>
+<div class="glow-top"></div>
+<div class="canvas">
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <div class="leg"><div class="leg-dot" style="background:var(--green);box-shadow:0 0 6px var(--green)"></div> built</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--amber);box-shadow:0 0 5px var(--amber)"></div> partial</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--red);box-shadow:0 0 6px var(--red)"></div> missing</div>
+  </div>
+
+  <!-- ───── USERS ───── -->
+  <div class="section-row"><div class="sr-line"></div><div class="sr-label">consumers</div><div class="sr-line"></div></div>
+  <div class="layer g2">
+    <div class="node blue">
+      <div class="node-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <div class="node-text">
+        <div class="node-name">End Users</div>
+        <div class="node-sub">web browser · email · slack</div>
+      </div>
+      <div class="status-pip"></div>
+    </div>
+    <div class="node blue">
+      <div class="node-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></svg>
+      </div>
+      <div class="node-text">
+        <div class="node-name">Company Admins</div>
+        <div class="node-sub">org · catalog · approvals</div>
+      </div>
+      <div class="status-pip"></div>
+    </div>
+  </div>
+
+  <div class="flow-arrow"></div>
+
+  <!-- ───── FRONTEND ───── -->
+  <div class="section-row"><div class="sr-line"></div><div class="sr-label">frontend</div><div class="sr-line"></div></div>
+  <div class="layer g3">
+    <div class="node green">
+      <div class="node-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      </div>
+      <div class="node-text">
+        <div class="node-name">Next.js 16</div>
+        <div class="node-sub">app router · RSC</div>
+      </div>
+      <div class="status-pip"></div>
+    </div>
+    <div class="node green">
+      <div class="node-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M8.56 2.75c4.37 6.03 6.02 9.42 8.03 17.72m2.54-15.38c-3.72 4.35-8.94 5.66-16.88 5.85m19.5 1.9c-3.5-.93-6.63-.82-8.94 0-2.58.92-5.01 2.86-7.44 6.32"/></svg>
+      </div>
+      <div class="node-text">
+        <div class="node-name">React 19</div>
+        <div class="node-sub">server actions · hooks</div>
+      </div>
+      <div class="status-pip"></div>
+    </div>
+    <div class="node green">
+      <div class="node-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      </div>
+      <div class="node-text">
+        <div class="node-name">Tailwind v4</div>
+        <div class="node-sub">postcss · globals.css</div>
+      </div>
+      <div class="status-pip"></div>
+    </div>
+  </div>
+
+  <div class="flow-arrow"></div>
+
+  <!-- ───── BACKEND ───── -->
+  <div class="section-row"><div class="sr-line"></div><div class="sr-label">backend</div><div class="sr-line"></div></div>
+  <div class="layer g4">
+    <div class="node green">
+      <div class="node-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+      </div>
+      <div class="node-text">
+        <div class="node-name">API Routes</div>
+        <div class="node-sub">/api/v1 · /api/stripe</div>
+      </div>
+      <div class="status-pip"></div>
+    </div>
+    <div class="node green">
+      <div class="node-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </div>
+      <div class="node-text">
+        <div class="node-name">better-auth v1.5</div>
+        <div class="node-sub">session · api-keys · social</div>
+      </div>
+      <div class="status-pip"></div>
+    </div>
+    <div class="node green">
+      <div class="node-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+      </div>
+      <div class="node-text">
+        <div class="node-name">Drizzle ORM</div>
+        <div class="node-sub">migrations · type-safe</div>
+      </div>
+      <div class="status-pip"></div>
+    </div>
+    <div class="node amber">
+      <div class="node-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="13 2 13 9 20 9"/><path d="M20 9L13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/></svg>
+      </div>
+      <div class="node-text">
+        <div class="node-name">Rate Limiter</div>
+        <div class="node-sub">in-memory sliding window</div>
+      </div>
+      <span class="partial-tag">redis needed</span>
+    </div>
+  </div>
+
+  <div class="flow-arrow"></div>
+
+  <!-- ───── SERVICES ───── -->
+  <div class="section-row"><div class="sr-line"></div><div class="sr-label">services</div><div class="sr-line"></div></div>
+  <div class="layer g4">
+    <div class="node green">
+      <div class="node-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+      </div>
+      <div class="node-text">
+        <div class="node-name">AI / LLM</div>
+        <div class="node-sub">vercel ai sdk · openai-compat</div>
+      </div>
+      <div class="status-pip"></div>
+    </div>
+    <div class="node green">
+      <div class="node-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+      </div>
+      <div class="node-text">
+        <div class="node-name">Resend</div>
+        <div class="node-sub">email · approval links</div>
+      </div>
+      <div class="status-pip"></div>
+    </div>
+    <div class="node green">
+      <div class="node-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+      </div>
+      <div class="node-text">
+        <div class="node-name">Stripe</div>
+        <div class="node-sub">starter · growth · enterprise</div>
+      </div>
+      <div class="status-pip"></div>
+    </div>
+    <div class="node green">
+      <div class="node-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.15 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.06 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.09 8.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21 16v.92z"/></svg>
+      </div>
+      <div class="node-text">
+        <div class="node-name">Slack</div>
+        <div class="node-sub">interactions · webhooks</div>
+      </div>
+      <div class="status-pip"></div>
+    </div>
+  </div>
+
+  <div class="flow-arrow"></div>
+
+  <!-- ───── DATABASE ───── -->
+  <div class="section-row"><div class="sr-line"></div><div class="sr-label">data layer</div><div class="sr-line"></div></div>
+  <div class="layer g3">
+    <div class="node green">
+      <div class="node-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+      </div>
+      <div class="node-text">
+        <div class="node-name">PostgreSQL 16</div>
+        <div class="node-sub">supabase cloud · docker local</div>
+      </div>
+      <div class="status-pip"></div>
+    </div>
+    <div class="node green">
+      <div class="node-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <div class="node-text">
+        <div class="node-name">Field Encryption</div>
+        <div class="node-sub">AES-GCM · API key PBKDF2</div>
+      </div>
+      <div class="status-pip"></div>
+    </div>
+    <div class="node red">
+      <div class="node-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M2 12h3m14 0h3M12 2v3m0 14v3M4.93 4.93l2.12 2.12m9.9 9.9 2.12 2.12M4.93 19.07l2.12-2.12m9.9-9.9 2.12-2.12"/></svg>
+      </div>
+      <div class="node-text">
+        <div class="node-name">Redis</div>
+        <div class="node-sub">rate-limiting · session cache</div>
+      </div>
+      <span class="missing-tag">missing</span>
+    </div>
+  </div>
+
+  <div class="flow-arrow"></div>
+
+  <!-- ───── INFRASTRUCTURE ───── -->
+  <div class="section-row"><div class="sr-line"></div><div class="sr-label">infrastructure</div><div class="sr-line"></div></div>
+  <div class="layer g3">
+    <div class="node red">
+      <div class="node-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></svg>
+      </div>
+      <div class="node-text">
+        <div class="node-name">Deployment</div>
+        <div class="node-sub">vercel · fly · docker · railway</div>
+      </div>
+      <span class="missing-tag">missing</span>
+    </div>
+    <div class="node red">
+      <div class="node-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      </div>
+      <div class="node-text">
+        <div class="node-name">Observability</div>
+        <div class="node-sub">sentry · posthog · datadog</div>
+      </div>
+      <span class="missing-tag">missing</span>
+    </div>
+    <div class="node amber">
+      <div class="node-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      </div>
+      <div class="node-text">
+        <div class="node-name">CI/CD</div>
+        <div class="node-sub">github actions · no deploy step</div>
+      </div>
+      <span class="partial-tag">no deploy</span>
+    </div>
+  </div>
+
+  <!-- ───── ENV / SECRETS ───── -->
+  <div class="section-row"><div class="sr-line"></div><div class="sr-label">env & secrets</div><div class="sr-line"></div></div>
+  <div class="layer g4">
+    <div class="node green">
+      <div class="node-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+      </div>
+      <div class="node-text">
+        <div class="node-name">API_KEY_PEPPER</div>
+        <div class="node-sub">auto-generated</div>
+      </div>
+      <div class="status-pip"></div>
+    </div>
+    <div class="node green">
+      <div class="node-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </div>
+      <div class="node-text">
+        <div class="node-name">FIELD_ENCRYPTION_KEY</div>
+        <div class="node-sub">auto-generated</div>
+      </div>
+      <div class="status-pip"></div>
+    </div>
+    <div class="node red">
+      <div class="node-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      </div>
+      <div class="node-text">
+        <div class="node-name">STRIPE_PRICE_IDs</div>
+        <div class="node-sub">create in stripe dashboard</div>
+      </div>
+      <span class="missing-tag">needed</span>
+    </div>
+    <div class="node red">
+      <div class="node-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      </div>
+      <div class="node-text">
+        <div class="node-name">OPENAI_API_KEY</div>
+        <div class="node-sub">platform fallback · embeddings</div>
+      </div>
+      <span class="missing-tag">needed</span>
+    </div>
+  </div>
+
+  <!-- ───── POLICY / OPTIONAL ───── -->
+  <div class="section-row"><div class="sr-line"></div><div class="sr-label">optional</div><div class="sr-line"></div></div>
+  <div class="layer g3">
+    <div class="node grey">
+      <div class="node-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <div class="node-text">
+        <div class="node-name">Policy Engine</div>
+        <div class="node-sub">OPA · OpenFGA sidecar</div>
+      </div>
+      <div class="status-pip"></div>
+    </div>
+    <div class="node grey">
+      <div class="node-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </div>
+      <div class="node-text">
+        <div class="node-name">Chat Ingest</div>
+        <div class="node-sub">bot relay · CHAT_INGEST_SECRET</div>
+      </div>
+      <div class="status-pip"></div>
+    </div>
+    <div class="node grey">
+      <div class="node-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      </div>
+      <div class="node-text">
+        <div class="node-name">Provision Webhook</div>
+        <div class="node-sub">PROVISION_WEBHOOK_URL</div>
+      </div>
+      <div class="status-pip"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Subtle entrance animation
+  document.querySelectorAll('.node').forEach((n,i)=>{
+    n.style.opacity='0';
+    n.style.transform='translateY(8px)';
+    setTimeout(()=>{
+      n.style.transition='opacity 0.3s ease, transform 0.3s ease';
+      n.style.opacity='1';
+      n.style.transform='translateY(0)';
+    }, i*30);
+  });
+</script>
+</body>
+</html>

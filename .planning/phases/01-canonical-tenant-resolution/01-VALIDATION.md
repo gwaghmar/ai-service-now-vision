@@ -40,7 +40,7 @@ created: 2026-04-14
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
 | TBD | 01 | 1 | TNTY-01 | T-1-01 | Single org per resolved channel context | unit | `npm run test:unit` | ⬜ Wave 0 | ⬜ pending |
 | TBD | 01 | 1 | TNTY-02 | T-1-02 | Unknown/ambiguous tenant → fail-closed error | unit/integration | `npm run test:unit` | ⬜ Wave 0 | ⬜ pending |
-| TBD | 01 | 1 | TNTY-04 | T-1-04 | Slack `team_id` maps before DB reads | integration | `npm run test:unit` | ⬜ Wave 0 | ⬜ pending |
+| TBD | 02 | 2 | TNTY-04 | T-1-04 | Slack `team_id` maps before DB reads | integration | `npm run test:unit` | ⬜ Wave 0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 

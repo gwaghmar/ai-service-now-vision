@@ -212,17 +212,11 @@ return { organizationId: row.organizationId, apiKeyId: row.id };
 
 **If this table is empty:** N/A — see table above for `[ASSUMED]` items.
 
-## Open Questions
+## Open Questions (RESOLVED for Phase 1)
 
-1. **Chat ingest: multi-channel vs single env org**
-   - What we know: `CHAT_INGEST_ORG_ID` pins one org [VERIFIED: `src/app/api/v1/ingest/chat/route.ts`].
-   - What's unclear: Is multi-workspace chat ingest in scope for Phase 1 or explicitly deferred?
-   - Recommendation: Either add resolver parity with Slack or document **single-tenant ingest mode** as intentional and enforce startup validation when multiple orgs exist.
+1. **Chat ingest:** Phase 1 implements verified single-org ingest via `resolveChatIngestOrgId()` (env id must exist in `organization`). Multi-workspace ingest is **deferred** beyond Phase 1.
 
-2. **Stripe webhook org linkage**
-   - What we know: `checkout.session.completed` uses `metadata.organizationId` [VERIFIED: `src/app/api/stripe/webhook/route.ts`].
-   - What's unclear: Whether subscription events always have `stripeCustomerId` pre-linked.
-   - Recommendation: Planner treats Stripe as **out of band** for TNTY unless REQUIREMENTS expand; no `.limit(1)` pattern there.
+2. **Stripe:** No Phase 1 code change; existing `metadata.organizationId` usage remains. Not required for TNTY-01/02/04 closure in this phase.
 
 ## Environment Availability
 

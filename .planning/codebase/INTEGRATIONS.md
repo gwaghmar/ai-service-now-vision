@@ -4,105 +4,99 @@
 
 ## APIs & External Services
 
-**AI Inference:**
-- OpenAI-compatible API provider (BYOK per org + optional platform fallback) - powers chat/triage flows.
-  - SDK/Client: `@ai-sdk/openai`, `ai` in `src/server/ai/client.ts`.
-  - Auth: `APP_AI_PLATFORM_API_KEY` (fallback) and encrypted per-org key in DB (`organizationAiSettings` read in `src/server/ai/client.ts`).
-  - Endpoint override: `APP_AI_PLATFORM_BASE_URL` and per-org `baseUrl`.
+**AI inference:**
+- OpenAI-compatible model endpoint (provider-configurable) - Organization and platform AI generation in `src/server/ai/client.ts`
+  - SDK/Client: `@ai-sdk/openai` + `ai`
+  - Auth: `APP_AI_PLATFORM_API_KEY` (fallback), org-scoped encrypted BYOK from `organization_ai_settings`
 
-**Billing:**
-- Stripe - subscription checkout, billing portal, webhook synchronization.
-  - SDK/Client: `stripe` in `src/lib/stripe.ts`.
-  - Auth: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, plus price ids in `.env.example`.
-  - Touchpoints: `src/app/api/stripe/checkout/route.ts`, `src/app/api/stripe/portal/route.ts`, `src/app/api/stripe/webhook/route.ts`.
+**Payments & billing:**
+- Stripe - Checkout sessions, customer portal, and subscription webhooks in `src/app/api/stripe/checkout/route.ts`, `src/app/api/stripe/portal/route.ts`, and `src/app/api/stripe/webhook/route.ts`
+  - SDK/Client: `stripe`
+  - Auth: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, plus price IDs (`STRIPE_STARTER_PRICE_ID`, `STRIPE_GROWTH_PRICE_ID`, `STRIPE_ENTERPRISE_PRICE_ID`)
 
-**Email Delivery:**
-- Resend HTTP API - transactional outbound email.
-  - SDK/Client: direct `fetch` to `https://api.resend.com/emails` in `src/server/email/send-email.ts`.
-  - Auth: `RESEND_API_KEY`, sender `EMAIL_FROM`.
+**Email delivery:**
+- Resend Email API - Transactional email sends in `src/server/email/send-email.ts`
+  - SDK/Client: direct `fetch` to `https://api.resend.com/emails`
+  - Auth: `RESEND_API_KEY` (with `EMAIL_FROM`)
 
-**ChatOps:**
-- Slack signed requests - slash commands + interaction endpoint.
-  - SDK/Client: custom signature verification using HMAC in `src/app/api/slack/slash/route.ts` and `src/lib/slack-signature.ts`.
-  - Auth: `SLACK_SIGNING_SECRET`.
-  - Touchpoints: `src/app/api/slack/slash/route.ts`, `src/app/api/integrations/slack/interactions/route.ts`.
+**Messaging/chat ingress:**
+- Slack request verification and slash-command handling in `src/app/api/slack/slash/route.ts` and `src/app/api/integrations/slack/interactions/route.ts`
+  - SDK/Client: native HMAC verification (`node:crypto`) and internal helpers in `src/lib/slack-signature.ts`
+  - Auth: `SLACK_SIGNING_SECRET`
 
-**Policy Decisioning:**
-- External policy engine over HTTP (OPA/OpenFGA-style adapter contract).
-  - SDK/Client: direct `fetch` in `src/server/policy-engine.ts`.
-  - Auth: none implemented in request headers; endpoint configured by `POLICY_ENGINE_URL`.
-
-**Provisioning/Automation:**
-- Outbound HTTP webhook connector for fulfillment.
-  - SDK/Client: direct `fetch` in `src/server/connectors/http-webhook.ts`.
-  - Auth: optional `PROVISION_WEBHOOK_BEARER`.
+**Policy/provision webhooks:**
+- External policy decision service in `src/server/policy-engine.ts`
+  - SDK/Client: direct `fetch`
+  - Auth: endpoint-based (`POLICY_ENGINE_URL`, optional timeout config)
+- External fulfillment webhook connector in `src/server/connectors/http-webhook.ts`
+  - SDK/Client: direct `fetch`
+  - Auth: `PROVISION_WEBHOOK_BEARER` (optional), endpoint `PROVISION_WEBHOOK_URL`
 
 ## Data Storage
 
 **Databases:**
-- PostgreSQL (Supabase cloud recommended; local Postgres/Supabase supported).
-  - Connection: `DATABASE_URL`.
-  - Client: `drizzle-orm` + `pg` in `src/db/index.ts`.
-  - Migration toolchain: `drizzle-kit` configured in `drizzle.config.ts`.
+- PostgreSQL (self-hosted or Supabase-managed)
+  - Connection: `DATABASE_URL`
+  - Client: `pg` pool + `drizzle-orm` in `src/db/index.ts`; migrations/config in `drizzle.config.ts`
 
 **File Storage:**
-- Local filesystem only for app code/docs; no app-level object storage client integration detected in `src/**`.
-- Supabase local dev config enables storage service in `supabase/config.toml`, but runtime app code does not call Supabase Storage APIs.
+- Local filesystem only for generated artifacts in process memory/response flow (for example PDF generation in `src/server/audit-pdf.ts`); no persistent blob-store client detected
 
 **Caching:**
-- Optional Redis rate limiting path via `ioredis` dynamic import in `src/server/agent-rate-limit.ts`.
-  - Connection: `REDIS_URL`.
-  - Fallback: in-memory fixed-window buckets when Redis is absent.
+- Optional Redis fixed-window rate-limit backend in `src/server/agent-rate-limit.ts`
+- Service/env: `REDIS_URL`
+- Client: dynamic import of `ioredis`
 
 ## Authentication & Identity
 
 **Auth Provider:**
-- Better Auth with Drizzle adapter (`better-auth`, `better-auth/adapters/drizzle`) in `src/lib/auth.ts`.
-  - Implementation: session auth + email/password + optional social OAuth providers (Google/GitHub/Microsoft env-gated) exposed via `src/app/api/auth/[...all]/route.ts`.
-  - Identity store: Postgres tables from `src/db/schema.ts`.
+- Better Auth
+  - Implementation: server auth config and DB adapter in `src/lib/auth.ts`; Next.js route binding in `src/app/api/auth/[...all]/route.ts`
+  - Core auth env: `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`
+  - Optional social OAuth providers: Google (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`), GitHub (`GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`), Microsoft (`MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_TENANT_ID`)
 
 ## Monitoring & Observability
 
 **Error Tracking:**
-- Dedicated SaaS error tracker not detected in `package.json` or `src/**`.
+- None detected (no Sentry/Bugsnag/etc package or client wiring)
 
 **Logs:**
-- Application logging via `console.info`, `console.warn`, and `console.error` in server modules such as `src/server/webhooks.ts`, `src/server/policy-engine.ts`, and `src/server/email/send-email.ts`.
+- Console-based operational logging in server modules (`src/server/webhooks.ts`, `src/server/email/send-email.ts`, `src/instrumentation.ts`)
 
 ## CI/CD & Deployment
 
 **Hosting:**
-- Vercel targeted deployment (`vercel.json` with Next.js framework).
+- Vercel Next.js target configured in `vercel.json`
 
 **CI Pipeline:**
-- GitHub Actions in `.github/workflows/ci.yml`.
-  - Includes Postgres service container, `npm ci`, lint/build/unit tests, Drizzle push/seed, and Playwright E2E.
+- GitHub Actions workflow at `.github/workflows/ci.yml` (Node setup, lint, build, unit tests, Drizzle push, seed, Playwright E2E)
 
 ## Environment Configuration
 
 **Required env vars:**
-- Core runtime: `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `NEXT_PUBLIC_APP_URL` (enforced by `src/lib/env.ts`).
-- Tenant bootstrap: `DEFAULT_ORGANIZATION_ID` or `DEFAULT_ORGANIZATION_SLUG` (`src/lib/env.ts`, `src/lib/auth.ts`).
-- Integration toggles/secrets: `STRIPE_*`, `RESEND_API_KEY`, `SLACK_SIGNING_SECRET`, `POLICY_ENGINE_URL`, `PROVISION_*`, `CRON_SECRET`, `CHAT_INGEST_SECRET`, `CHAT_INGEST_ORG_ID`, `APP_AI_PLATFORM_*`, `FIELD_ENCRYPTION_KEY` (documented in `.env.example` and used across `src/**`).
+- Platform/core: `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `NEXT_PUBLIC_APP_URL`, one of `DEFAULT_ORGANIZATION_ID` or `DEFAULT_ORGANIZATION_SLUG` (`README.md`, `src/lib/env.ts`)
+- AI: `APP_AI_PLATFORM_API_KEY` (fallback mode), optional `APP_AI_PLATFORM_BASE_URL`, `APP_AI_PLATFORM_MODEL` (`src/server/ai/client.ts`)
+- Billing: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, Stripe price IDs (`src/lib/stripe.ts`, `src/app/api/stripe/webhook/route.ts`)
+- Email: `RESEND_API_KEY`, optional `EMAIL_FROM` (`src/server/email/send-email.ts`)
+- Worker/security/integration: `CRON_SECRET`, `SLACK_SIGNING_SECRET`, `CHAT_INGEST_SECRET`, `CHAT_INGEST_ORG_ID`, `PROVISION_CONNECTOR`, `PROVISION_WEBHOOK_URL`, optional `PROVISION_WEBHOOK_BEARER`, `POLICY_ENGINE_URL`, `FIELD_ENCRYPTION_KEY`, optional `REDIS_URL` (`src/app/api/internal/worker/fulfillment/route.ts`, `src/lib/env.ts`, `src/server/agent-rate-limit.ts`)
 
 **Secrets location:**
-- Local env files `.env.local` / `.env` loaded by tooling (`drizzle.config.ts`, `playwright.config.ts`).
-- Runtime environment variables in deployment platform (production checks in `src/instrumentation.ts` and `src/lib/env.ts`).
-- Org-level AI keys and webhook signing secrets are persisted in database tables and decrypted through `src/lib/field-encryption.ts` consumers (`src/server/ai/client.ts`, `src/server/webhooks.ts`).
+- Local development: `.env.local` / `.env` (referenced in `drizzle.config.ts` and `playwright.config.ts`)
+- Cloud/runtime: deployment environment variables (Vercel for app, provider dashboards for external services)
 
 ## Webhooks & Callbacks
 
 **Incoming:**
-- Stripe webhook endpoint `POST /api/stripe/webhook` in `src/app/api/stripe/webhook/route.ts`.
-- Internal worker trigger `POST /api/internal/worker/fulfillment` in `src/app/api/internal/worker/fulfillment/route.ts` (Bearer `CRON_SECRET`).
-- Slack ingress endpoints in `src/app/api/slack/slash/route.ts` and `src/app/api/integrations/slack/interactions/route.ts`.
-- Agent/chat ingress endpoint `POST /api/v1/ingest/chat` in `src/app/api/v1/ingest/chat/route.ts`.
+- `POST /api/stripe/webhook` - Stripe subscription lifecycle updates (`src/app/api/stripe/webhook/route.ts`)
+- `POST /api/slack/slash` - Slack slash command endpoint (`src/app/api/slack/slash/route.ts`)
+- `POST /api/integrations/slack/interactions` - Slack interactivity endpoint (`src/app/api/integrations/slack/interactions/route.ts`)
+- `POST /api/internal/worker/fulfillment` - scheduled internal worker trigger with bearer secret (`src/app/api/internal/worker/fulfillment/route.ts`)
 
 **Outgoing:**
-- Resend API POST in `src/server/email/send-email.ts`.
-- Policy engine POST in `src/server/policy-engine.ts`.
-- Provisioning webhook POST in `src/server/connectors/http-webhook.ts`.
-- Organization webhook deliveries (request/provision events) in `src/server/webhooks.ts`.
+- Resend API `POST https://api.resend.com/emails` (`src/server/email/send-email.ts`)
+- Organization-configured governance webhooks (`targetUrl` from DB) with HMAC signatures (`src/server/webhooks.ts`)
+- Provision connector outbound POST to `PROVISION_WEBHOOK_URL` (`src/server/connectors/http-webhook.ts`)
+- Policy engine POST to `POLICY_ENGINE_URL` (`src/server/policy-engine.ts`)
 
 ---
 

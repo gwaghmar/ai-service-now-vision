@@ -5,86 +5,92 @@
 ## Naming Patterns
 
 **Files:**
-- Use kebab-case for module files and route handlers (for example `src/server/change-ticket.ts`, `src/app/api/v1/requests/route.ts`, `src/lib/request-schemas.ts`).
-- Use `page.tsx`, `layout.tsx`, and `route.ts` for Next.js App Router entries under `src/app/**`.
-- Use `.test.ts` for unit/integration tests in `tests/` and `.spec.ts` for Playwright E2E in `e2e/`.
+- Route handlers use `route.ts` under App Router API directories (example: `src/app/api/v1/requests/route.ts`).
+- Server utilities use kebab-case `.ts` files (examples: `src/server/request-decision.ts`, `src/server/agent-rate-limit.ts`).
+- React component files use kebab-case `.tsx` even for exported PascalCase components (example: `src/app/(dashboard)/requests/new/new-request-form.tsx` exports `NewRequestForm`).
+- Test files use `*.test.ts` in `tests/` for unit tests and `*.spec.ts` in `e2e/` for Playwright flows (examples: `tests/request-schemas.test.ts`, `e2e/governance-flow.spec.ts`).
 
 **Functions:**
-- Use camelCase for functions and actions (`parseFieldSchema`, `assertAiRequestGuard`, `adminCreateRequestType`).
-- Prefix guard/assertion functions with `assert` or `require` for invariant checks (`src/server/ai/request-guard.ts`, `src/app/actions/admin.ts`).
+- Exported functions use camelCase and describe intent clearly (`createRequestAction` in `src/app/actions/requests.ts`, `sendTransactionalEmail` in `src/server/email/send-email.ts`).
+- Internal helpers stay local and camelCase (`parseLimit`, `tooMany` in `src/app/api/v1/requests/route.ts`).
+- Boolean-style helpers use `is*` / `has*` naming (`isProduction` in `src/lib/env.ts`).
 
 **Variables:**
-- Use camelCase for local variables and `UPPER_SNAKE_CASE` for module constants (`MAX_AI_MESSAGES`, `WINDOW_MS`).
-- Use descriptive env-derived variable names (`ipLimit`, `keyLimit`, `e2ePublicOrigin`).
+- Local variables use concise camelCase (`orgId`, `requesterId`, `fieldSchema` in `src/app/actions/requests.ts`).
+- Constant configuration values are uppercase snake case (`WINDOW_MS` in `src/app/api/v1/requests/route.ts`).
 
 **Types:**
-- Use PascalCase for type aliases (`FieldDefinition`, `RequestTypeOption`) and union literals for constrained roles/states (`Role`, actorRole unions in `src/server/change-ticket.ts`).
+- Type aliases and exported types use PascalCase (`FieldType`, `FieldSchemaJson`, `RequestTypeOption` in `src/lib/request-schemas.ts` and `src/app/(dashboard)/requests/new/new-request-form.tsx`).
 
 ## Code Style
 
 **Formatting:**
-- Primary formatter is implicit through TypeScript + ESLint style; no dedicated Prettier or Biome config detected.
-- Use trailing commas and multiline object/array formatting in larger structures (`src/app/actions/admin.ts`, `next.config.ts`).
-- Use semicolons consistently across TS/TSX files.
+- Tool used: ESLint with Next.js core + TypeScript presets from `eslint.config.mjs`.
+- Key observed style: semicolons enabled, double quotes, trailing commas on multiline objects/arrays/functions (seen across `src/lib/env.ts`, `src/app/actions/requests.ts`, `e2e/governance-flow.spec.ts`).
+- No dedicated Prettier config detected; rely on ESLint + editor formatting.
 
 **Linting:**
-- Use ESLint flat config from `eslint.config.mjs` with `eslint-config-next/core-web-vitals` and `eslint-config-next/typescript`.
-- Respect Next default ignores plus explicit ignore list in `eslint.config.mjs` (`.next/**`, `out/**`, `build/**`, `next-env.d.ts`).
-- Avoid broad lint suppressions; only targeted suppression observed is for dynamic Redis import in `src/server/agent-rate-limit.ts`.
+- Tool used: `eslint` script in `package.json` with flat config in `eslint.config.mjs`.
+- Config extends `eslint-config-next/core-web-vitals` and `eslint-config-next/typescript`.
+- Ignore paths include `.next/**`, `out/**`, `build/**`, and `next-env.d.ts` in `eslint.config.mjs`.
 
 ## Import Organization
 
 **Order:**
-1. Node built-ins and framework imports first (`crypto`, `next/*`, `react`, `zod`).
-2. Third-party package imports second (`drizzle-orm`, `@playwright/test`, `vitest`).
-3. Internal alias imports last via `@/` paths (`@/lib/*`, `@/server/*`, `@/db/*`).
+1. Framework/runtime imports first (`next/cache`, `drizzle-orm`, `zod` in `src/app/actions/requests.ts`).
+2. Internal alias imports (`@/db`, `@/lib/*`, `@/server/*`) next.
+3. Type-only imports are inlined with `type` keyword when needed (`type SimilarRequest` in `src/app/(dashboard)/requests/new/new-request-form.tsx`).
 
 **Path Aliases:**
-- Use `@/* -> ./src/*` from `tsconfig.json`.
-- Prefer alias imports over deep relative paths in app and server code.
+- Use `@/*` alias mapped in `tsconfig.json` (`"@/*": ["./src/*"]`).
+- Prefer alias imports over deep relative paths for app code (examples in `src/app/api/v1/requests/route.ts` and tests like `tests/request-schemas.test.ts`).
 
 ## Error Handling
 
 **Patterns:**
-- Validate input boundaries with Zod `safeParse` and return structured API errors (`src/app/api/v1/requests/route.ts`, `src/app/api/v1/ingest/chat/route.ts`).
-- Return JSON errors with stable shape `{ error, code, details? }` for API endpoints.
-- Throw `Error` for domain/service invariants in server modules (`src/server/change-ticket.ts`, `src/app/actions/admin.ts`).
-- Use specific domain error classes when policy-level branching is needed (`PolicyDeniedError` handling in API routes).
+- API routes validate input with Zod and return structured JSON errors (`{ error, code, details? }`) via `Response.json` in `src/app/api/v1/requests/route.ts`.
+- Server actions throw `Error` for invalid auth/ownership/state and return typed `{ ok: false }` for recoverable validation outcomes (`src/app/actions/requests.ts`).
+- Domain errors are handled explicitly with `instanceof` checks before fallback throw (`PolicyDeniedError` handling in `src/app/api/v1/requests/route.ts` and `src/app/actions/requests.ts`).
 
 ## Logging
 
-**Framework:** `console` (minimal usage observed)
+**Framework:** `console` APIs (`console.warn`, `console.info`) and no centralized logger detected.
 
 **Patterns:**
-- Prefer explicit warnings for non-fatal config fallbacks (`console.warn` in `src/lib/env.ts`).
-- Default pattern is fail-fast via exceptions at boundary checks rather than verbose runtime logging.
+- Configuration/runtime warnings use prefixed log messages (`[env]` in `src/lib/env.ts`, `[email]` in `src/server/email/send-email.ts`).
+- External service failures log status + body snippet and return controlled result objects (`src/server/email/send-email.ts`).
+- Use logs for degraded-mode behavior (missing optional integrations) instead of throwing (`src/server/email/send-email.ts`).
 
 ## Comments
 
 **When to Comment:**
-- Add comments for non-obvious security, environment, or compatibility rationale (`next.config.ts`, `playwright.config.ts`, `src/server/agent-rate-limit.ts`).
-- Use short section-divider comments in infrastructure-heavy modules (`src/server/agent-rate-limit.ts`).
+- Add short comments for security, production guardrails, and environment assumptions (examples in `src/lib/env.ts`, `playwright.config.ts`).
+- Avoid narrative comments for straightforward mapping/query code; most business logic remains uncommented (`src/app/actions/requests.ts`).
 
 **JSDoc/TSDoc:**
-- Use short doc comments for exported behavior and production assumptions (`src/lib/env.ts`, `src/server/agent-rate-limit.ts`, `src/app/actions/admin.ts`).
-- Avoid over-commenting self-explanatory CRUD/query code.
+- JSDoc-style block comments appear on exported functions that encode environment/runtime contracts (`assertProductionEnv`, `getTrustedAuthOrigins` in `src/lib/env.ts`).
+- Inline comments are used sparingly for nuanced coercion or fallback reasoning (`src/lib/request-schemas.ts`).
 
 ## Function Design
 
-**Size:** Keep helpers small in `src/lib/*` and `src/server/*`; large admin action files can contain many cohesive exported actions (`src/app/actions/admin.ts`).
+**Size:** No strict size guard detected; both compact helpers and large action/component functions coexist (for example `NewRequestForm` in `src/app/(dashboard)/requests/new/new-request-form.tsx` is large).
 
-**Parameters:** Use typed object params for multi-argument service functions (`createChangeTicketRecord(input)`, `assertAiRequestGuard(input)`), and explicit inline object types when no shared type exists.
+**Parameters:**
+- Inputs are frequently object-shaped for readability and future extensibility (`sendTransactionalEmail(input)`, `createRequestAction(input)`).
+- Boundary schemas validate function/action inputs immediately (`createRequestInputSchema`, `decideApprovalInputSchema` in `src/app/actions/requests.ts`).
 
 **Return Values:**
-- API routes return `Response.json(...)` with explicit status codes.
-- Server actions often return `{ ok: true as const }` for simple mutation acknowledgement.
-- Service functions return primitives/records when needed (`Promise<string>` for new IDs).
+- APIs return `Response` with status codes and typed JSON payloads (`src/app/api/v1/requests/route.ts`).
+- Server actions return discriminated object results for UI handling (`{ ok: true, requestId }` vs `{ ok: false, error }` in `src/app/actions/requests.ts`).
 
 ## Module Design
 
-**Exports:** Favor named exports and colocated helper functions; no default exports in sampled server/lib modules.
+**Exports:**
+- Prefer named exports over default exports in app/server/lib modules (`src/lib/request-schemas.ts`, `src/app/actions/requests.ts`).
+- Config files may use default export where framework expects it (`vitest.config.ts`, `playwright.config.ts`).
 
-**Barrel Files:** Not a dominant pattern in core application code; import from concrete module paths (`@/lib/request-schemas`, `@/server/create-request`).
+**Barrel Files:**
+- Barrel-file usage is minimal; direct imports from concrete module paths are standard (`@/server/create-request`, `@/lib/session` in `src/app/actions/requests.ts`).
 
 ---
 

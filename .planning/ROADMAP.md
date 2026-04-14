@@ -24,7 +24,9 @@
   1. Requests created from UI, API, Slack, and webhooks are each tied to exactly one organization.
   2. Ambiguous or unknown tenant context returns explicit fail-closed errors and does not process request actions.
   3. Slack/ChatOps interactions cannot read or mutate request data unless workspace-to-org mapping is validated first.
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] `01-PLAN-01.md` — Schema (`slack_team_id`), blocking `drizzle-kit push`, `tenant-resolution.ts`, unit tests (TNTY-01, TNTY-02).
+- [ ] `01-PLAN-02.md` — Slack slash + chat ingest wiring + admin Slack Team ID field (TNTY-01, TNTY-02, TNTY-04).
 
 ### Phase 2: Org Authorization and Governance Safety
 **Goal**: Access and policy decisions are fail-closed, role-scoped, and auditable for high-impact operations.
@@ -97,7 +99,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Canonical Tenant Resolution | 0/0 | Not started | - |
+| 1. Canonical Tenant Resolution | 0/2 | Not started | - |
 | 2. Org Authorization and Governance Safety | 0/0 | Not started | - |
 | 3. Idempotent Lifecycle Transitions | 0/0 | Not started | - |
 | 4. Distributed Runtime Reliability | 0/0 | Not started | - |

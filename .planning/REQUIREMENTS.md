@@ -70,28 +70,28 @@
 |-------------|-------|--------|
 | TNTY-01 | Phase 1 | Pending |
 | TNTY-02 | Phase 1 | Pending |
-| TNTY-03 | Phase 1 | Pending |
+| TNTY-03 | Phase 2 | Pending |
 | TNTY-04 | Phase 1 | Pending |
-| GOV-01 | Phase 1 | Pending |
-| GOV-02 | Phase 1 | Pending |
-| GOV-03 | Phase 1 | Pending |
-| GOV-04 | Phase 1 | Pending |
-| RLY-01 | Phase 2 | Pending |
-| RLY-02 | Phase 2 | Pending |
-| RLY-03 | Phase 2 | Pending |
-| RLY-04 | Phase 2 | Pending |
-| API-01 | Phase 3 | Pending |
-| API-02 | Phase 3 | Pending |
-| API-03 | Phase 3 | Pending |
-| API-04 | Phase 3 | Pending |
-| OBS-01 | Phase 4 | Pending |
-| OBS-02 | Phase 4 | Pending |
-| OBS-03 | Phase 4 | Pending |
-| OBS-04 | Phase 4 | Pending |
-| AUTO-01 | Phase 5 | Pending |
-| AUTO-02 | Phase 5 | Pending |
-| AUTO-03 | Phase 5 | Pending |
-| AUTO-04 | Phase 5 | Pending |
+| GOV-01 | Phase 2 | Pending |
+| GOV-02 | Phase 2 | Pending |
+| GOV-03 | Phase 2 | Pending |
+| GOV-04 | Phase 2 | Pending |
+| RLY-01 | Phase 3 | Pending |
+| RLY-02 | Phase 3 | Pending |
+| RLY-03 | Phase 4 | Pending |
+| RLY-04 | Phase 4 | Pending |
+| API-01 | Phase 5 | Pending |
+| API-02 | Phase 5 | Pending |
+| API-03 | Phase 5 | Pending |
+| API-04 | Phase 5 | Pending |
+| OBS-01 | Phase 6 | Pending |
+| OBS-02 | Phase 6 | Pending |
+| OBS-03 | Phase 6 | Pending |
+| OBS-04 | Phase 6 | Pending |
+| AUTO-01 | Phase 7 | Pending |
+| AUTO-02 | Phase 7 | Pending |
+| AUTO-03 | Phase 7 | Pending |
+| AUTO-04 | Phase 7 | Pending |
 
 **Coverage:**
 - v1 requirements: 24 total
@@ -100,4 +100,4 @@
 
 ---
 *Requirements defined: 2026-04-14*  
-*Last updated: 2026-04-14 after initial definition*
+*Last updated: 2026-04-14 after roadmap alignment*

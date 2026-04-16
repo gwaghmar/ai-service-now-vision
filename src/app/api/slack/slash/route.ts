@@ -1,7 +1,8 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { db } from "@/db";
-import { organization, requestType } from "@/db/schema";
-import { eq, isNull } from "drizzle-orm";
+import { requestType } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { resolveOrgForSlackTeamId } from "@/server/tenant-resolution";
 import { getPublicAppUrl } from "@/lib/env";
 
 export const runtime = "nodejs";
@@ -46,16 +47,15 @@ export async function POST(req: Request) {
   const text = (params.get("text") ?? "").trim();
   const teamId = params.get("team_id") ?? "";
 
-  // Look up the org by Slack team ID stored in webhookSigningSecret metadata
-  // (for now match on any active org — single-org deployments)
-  const [org] = await db
-    .select({ id: organization.id, name: organization.name })
-    .from(organization)
-    .limit(1);
-
-  if (!org) {
-    return slackText("No organization found for this workspace.");
+  // Canonical tenant resolution — fail-closed before any org-scoped reads.
+  const orgResult = await resolveOrgForSlackTeamId(teamId);
+  if (!orgResult.ok) {
+    return Response.json(
+      { error: orgResult.message, code: orgResult.code },
+      { status: orgResult.httpStatus },
+    );
   }
+  const org = { id: orgResult.organizationId, name: orgResult.name };
 
   const base = getPublicAppUrl().replace(/\/$/, "");
 

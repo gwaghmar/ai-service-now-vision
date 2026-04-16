@@ -285,6 +285,38 @@ export async function adminUpdateOrgWebhooks(input: {
   return { ok: true as const };
 }
 
+/**
+ * Persist the Slack workspace id (team_id) for the session org.
+ * Empty string clears the mapping; unique index prevents cross-tenant conflicts.
+ */
+export async function adminUpdateSlackTeamId(input: { slackTeamId: string }) {
+  const session = await requireSession();
+  const orgId = requireAdminOrg(session);
+
+  const boundary = z
+    .object({ slackTeamId: z.string().max(32) })
+    .safeParse(input);
+  if (!boundary.success) throw new Error("Invalid Slack team ID.");
+
+  const value = boundary.data.slackTeamId.trim() || null;
+
+  try {
+    await db
+      .update(organization)
+      .set({ slackTeamId: value })
+      .where(eq(organization.id, orgId));
+  } catch (err: unknown) {
+    // Unique constraint: another org already owns this workspace id.
+    if (err instanceof Error && err.message.includes("organization_slack_team_id_unique")) {
+      return { ok: false as const, error: "This Slack workspace is already mapped to another organization." };
+    }
+    throw err;
+  }
+
+  revalidatePath("/admin/integrations");
+  return { ok: true as const };
+}
+
 const bulkCatalogItem = z.object({
   slug: z
     .string()

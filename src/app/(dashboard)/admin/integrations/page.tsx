@@ -14,7 +14,7 @@ export default async function AdminIntegrationsPage() {
   if (!orgId) return <p className="text-red-600">No organization.</p>;
 
   const [org] = await db
-    .select({ webhookUrl: organization.webhookUrl })
+    .select({ webhookUrl: organization.webhookUrl, slackTeamId: organization.slackTeamId })
     .from(organization)
     .where(eq(organization.id, orgId))
     .limit(1);
@@ -44,7 +44,7 @@ export default async function AdminIntegrationsPage() {
         </p>
       </div>
 
-      <IntegrationsForm initialUrl={org?.webhookUrl ?? ""} />
+      <IntegrationsForm initialUrl={org?.webhookUrl ?? ""} initialSlackTeamId={org?.slackTeamId ?? ""} />
     </div>
   );
 }

@@ -7,6 +7,7 @@ import {
   findRequestTypeBySlug,
   findUserByEmailInOrg,
 } from "@/server/create-request";
+import { resolveChatIngestOrgId } from "@/server/tenant-resolution";
 
 export const runtime = "nodejs";
 
@@ -34,13 +35,14 @@ export async function POST(req: Request) {
     return Response.json({ error: "Unauthorized", code: "unauthorized" }, { status: 401 });
   }
 
-  const orgId = process.env.CHAT_INGEST_ORG_ID?.trim();
-  if (!orgId) {
+  const orgResolution = await resolveChatIngestOrgId();
+  if (!orgResolution.ok) {
     return Response.json(
-      { error: "CHAT_INGEST_ORG_ID missing", code: "misconfigured" },
-      { status: 503 },
+      { error: orgResolution.message, code: orgResolution.code },
+      { status: orgResolution.httpStatus },
     );
   }
+  const orgId = orgResolution.organizationId;
 
   const ip = getClientIp(req);
   const ipCheck = await rateLimitAllow(`chat-ingest:ip:${ip}`, 60, WINDOW_MS);

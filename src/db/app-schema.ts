@@ -10,23 +10,34 @@ import {
 } from "drizzle-orm/pg-core";
 import { user } from "./auth-schema";
 
-export const organization = pgTable("organization", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  slug: text("slug").notNull().unique(),
-  /** Outbound webhook (Slack/custom receiver). POST with HMAC signature when set. */
-  webhookUrl: text("webhook_url"),
-  /** Optional secret for `X-Governance-Signature` (HMAC-SHA256 of raw body). */
-  webhookSigningSecret: text("webhook_signing_secret"),
-  /** Stripe billing */
-  stripeCustomerId: text("stripe_customer_id"),
-  stripeSubscriptionId: text("stripe_subscription_id"),
-  stripeSubscriptionStatus: text("stripe_subscription_status"),
-  stripePriceId: text("stripe_price_id"),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-});
+export const organization = pgTable(
+  "organization",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    slug: text("slug").notNull().unique(),
+    /** Outbound webhook (Slack/custom receiver). POST with HMAC signature when set. */
+    webhookUrl: text("webhook_url"),
+    /** Optional secret for `X-Governance-Signature` (HMAC-SHA256 of raw body). */
+    webhookSigningSecret: text("webhook_signing_secret"),
+    /** Slack workspace id for canonical tenant resolution. Unique when set; null = unmapped. */
+    slackTeamId: text("slack_team_id"),
+    /** Stripe billing */
+    stripeCustomerId: text("stripe_customer_id"),
+    stripeSubscriptionId: text("stripe_subscription_id"),
+    stripeSubscriptionStatus: text("stripe_subscription_status"),
+    stripePriceId: text("stripe_price_id"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    /** Unique across non-null Slack workspace ids -- prevents cross-tenant confusion. */
+    uniqueIndex("organization_slack_team_id_unique")
+      .on(t.slackTeamId)
+      .where(sql`${t.slackTeamId} is not null`),
+  ],
+);
 
 /** Agent/service credentials: store hash only; plaintext shown once on create. */
 export const apiKey = pgTable(

@@ -1,4 +1,4 @@
-# AI Governance MVP
+# Aether Ops
 
 Web app for the flow **request → approve → fulfill (connector) → audit + CSV export**, aligned with `COMBINED-VISION.md` in this repo. Fulfillment is pluggable: local **stub**, **http_webhook** for external automation, or additional connectors as you add them.
 

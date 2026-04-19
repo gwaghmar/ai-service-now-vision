@@ -71,6 +71,7 @@ export const requestType = pgTable(
     description: text("description"),
     fieldSchema: jsonb("field_schema").notNull().$type<unknown>(),
     riskDefaults: jsonb("risk_defaults").notNull().$type<unknown>(),
+    appCatalogId: text("app_catalog_id"), // Reference to the app_catalog, added via relations below
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -451,6 +452,57 @@ export const organizationAiSettingsRelations = relations(
   }),
 );
 
+/** Unified App Catalog serving as the central knowledge and registry DB */
+export const appCatalog = pgTable("app_catalog", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  appName: text("app_name").notNull(),
+  vendor: text("vendor").notNull(),
+  category: text("category").notNull(),
+  connectorType: text("connector_type").notNull().default("manual_ticketing"),
+  ssoSupport: text("sso_support").notNull().default("false"),
+  telemetrySupport: text("telemetry_support").notNull().default("none"),
+  knownLimits: text("known_limits"),
+  setupGuideUrl: text("setup_guide_url"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** Maps Okta / Google Workspace Groups to Request Types */
+export const oktaGroupMapping = pgTable("okta_group_mapping", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  groupName: text("group_name").notNull(),
+  requestTypeId: text("request_type_id")
+    .notNull()
+    .references(() => requestType.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("okta_group_mapping_org_group_type_unique").on(t.organizationId, t.groupName, t.requestTypeId)
+]);
+
+export const appCatalogRelations = relations(appCatalog, ({ one, many }) => ({
+  organization: one(organization, {
+    fields: [appCatalog.organizationId],
+    references: [organization.id],
+  }),
+  requestTypes: many(requestType),
+}));
+
+export const oktaGroupMappingRelations = relations(oktaGroupMapping, ({ one }) => ({
+  organization: one(organization, {
+    fields: [oktaGroupMapping.organizationId],
+    references: [organization.id],
+  }),
+  requestType: one(requestType, {
+    fields: [oktaGroupMapping.requestTypeId],
+    references: [requestType.id],
+  }),
+}));
+
 export const organizationOnboardingRelations = relations(
   organizationOnboarding,
   ({ one }) => ({
@@ -517,6 +569,8 @@ export const organizationRelations = relations(organization, ({ many, one }) => 
   onboarding: one(organizationOnboarding),
   invites: many(organizationInvite),
   emailSettings: one(organizationEmailSettings),
+  appCatalogs: many(appCatalog),
+  oktaGroupMappings: many(oktaGroupMapping),
 }));
 
 export const changeTemplateRelations = relations(
@@ -563,8 +617,13 @@ export const requestTypeRelations = relations(requestType, ({ one, many }) => ({
     fields: [requestType.organizationId],
     references: [organization.id],
   }),
+  appCatalog: one(appCatalog, {
+    fields: [requestType.appCatalogId],
+    references: [appCatalog.id],
+  }),
   requests: many(request),
   approvalRoutingRules: many(approvalRoutingRule),
+  oktaGroupMappings: many(oktaGroupMapping),
 }));
 
 export const requestRelations = relations(request, ({ one, many }) => ({

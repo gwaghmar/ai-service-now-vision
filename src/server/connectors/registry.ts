@@ -1,14 +1,13 @@
 import type { ProvisionConnector } from "./types";
 
 /**
- * Selects provision implementation via PROVISION_CONNECTOR:
- * - stub (default): local simulation
- * - log: logs then stub
- * - http_webhook: POST to PROVISION_WEBHOOK_URL
- * - manual_ticketing: updates state to require human IT action
+ * Selects provision implementation. Priority:
+ * 1. Explicit connectorId from request type (per-type routing)
+ * 2. PROVISION_CONNECTOR env (global fallback)
+ * 3. "stub" (dev default)
  */
-export function getConnector(): ProvisionConnector {
-  const name = process.env.PROVISION_CONNECTOR?.trim() || "stub";
+export function getConnector(connectorId?: string | null): ProvisionConnector {
+  const name = connectorId?.trim() || process.env.PROVISION_CONNECTOR?.trim() || "stub";
 
   if (name === "http_webhook") {
     return {
@@ -16,6 +15,10 @@ export function getConnector(): ProvisionConnector {
       async provision(ctx) {
         const { runHttpWebhookProvision } = await import("./http-webhook");
         await runHttpWebhookProvision(ctx);
+      },
+      async revoke(ctx) {
+        const { runHttpWebhookRevoke } = await import("./http-webhook");
+        await runHttpWebhookRevoke(ctx);
       },
     };
   }
@@ -26,6 +29,38 @@ export function getConnector(): ProvisionConnector {
       async provision(ctx) {
         const { runManualProvisionFallback } = await import("./manual-ticketing");
         await runManualProvisionFallback(ctx);
+      },
+      async revoke(ctx) {
+        const { runManualRevokeFallback } = await import("./manual-ticketing");
+        await runManualRevokeFallback(ctx);
+      },
+    };
+  }
+
+  if (name === "github") {
+    return {
+      name: "github",
+      async provision(ctx) {
+        const { runGitHubProvision } = await import("./github");
+        await runGitHubProvision(ctx);
+      },
+      async revoke(ctx) {
+        const { runGitHubRevoke } = await import("./github");
+        await runGitHubRevoke(ctx);
+      },
+    };
+  }
+
+  if (name === "google_workspace") {
+    return {
+      name: "google_workspace",
+      async provision(ctx) {
+        const { runGoogleWorkspaceProvision } = await import("./google-workspace");
+        await runGoogleWorkspaceProvision(ctx);
+      },
+      async revoke(ctx) {
+        const { runGoogleWorkspaceRevoke } = await import("./google-workspace");
+        await runGoogleWorkspaceRevoke(ctx);
       },
     };
   }
@@ -38,6 +73,11 @@ export function getConnector(): ProvisionConnector {
         const { runProvisionStub } = await import("@/server/fulfillment");
         await runProvisionStub(ctx);
       },
+      async revoke(ctx) {
+        console.info("[connector:log] revoke", ctx);
+        const { runRevokeStub } = await import("@/server/fulfillment");
+        await runRevokeStub(ctx);
+      },
     };
   }
 
@@ -46,6 +86,10 @@ export function getConnector(): ProvisionConnector {
     async provision(ctx) {
       const { runProvisionStub } = await import("@/server/fulfillment");
       await runProvisionStub(ctx);
+    },
+    async revoke(ctx) {
+      const { runRevokeStub } = await import("@/server/fulfillment");
+      await runRevokeStub(ctx);
     },
   };
 }

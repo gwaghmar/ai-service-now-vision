@@ -5,6 +5,7 @@ import { adminCreateApiKey } from "@/app/actions/admin";
 
 export function CreateApiKeyForm() {
   const [name, setName] = useState("");
+  const [allowedSlugs, setAllowedSlugs] = useState("");
   const [shownKey, setShownKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -23,6 +24,7 @@ export function CreateApiKeyForm() {
           onClick={() => {
             setShownKey(null);
             setName("");
+            setAllowedSlugs("");
           }}
           className="mt-3 text-sm underline"
         >
@@ -40,7 +42,7 @@ export function CreateApiKeyForm() {
         setError(null);
         setPending(true);
         try {
-          const res = await adminCreateApiKey({ name });
+          const res = await adminCreateApiKey({ name, allowedSlugs });
           if (res.ok && res.fullKey) setShownKey(res.fullKey);
         } catch (err) {
           setError(err instanceof Error ? err.message : "Failed");
@@ -59,6 +61,18 @@ export function CreateApiKeyForm() {
           required
           placeholder="e.g. Staging agent"
           className="mt-1 block w-56 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-950"
+        />
+      </div>
+      <div>
+        <label htmlFor="api-key-slugs" className="text-xs font-medium">
+          Allowed type slugs (comma-separated, optional)
+        </label>
+        <input
+          id="api-key-slugs"
+          value={allowedSlugs}
+          onChange={(e) => setAllowedSlugs(e.target.value)}
+          placeholder="e.g. github_access, aws_sso"
+          className="mt-1 block w-64 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-950"
         />
       </div>
       <button

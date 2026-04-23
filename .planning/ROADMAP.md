@@ -6,13 +6,13 @@
 
 ## Phases
 
-- [ ] **Phase 1: Canonical Tenant Resolution** - Normalize tenant identity across UI, API, Slack, and webhook channels with fail-closed behavior.
-- [ ] **Phase 2: Org Authorization and Governance Safety** - Enforce least-privilege access and policy-driven approval controls with audited overrides.
-- [ ] **Phase 3: Idempotent Lifecycle Transitions** - Make request creation, approvals, and fulfillment transitions retry-safe and deterministic.
-- [ ] **Phase 4: Distributed Runtime Reliability** - Harden shared rate limiting and webhook delivery reliability for multi-instance deployments.
-- [ ] **Phase 5: API and Agent Execution Guardrails** - Stabilize external contracts and secure agent/API action execution boundaries.
-- [ ] **Phase 6: Audit and Operational Observability** - Deliver immutable evidence, exportability, and correlated diagnostics for operators.
-- [ ] **Phase 7: Automation UX and AI-Triage Experience** - Improve request submission, triage guidance, and status clarity without bypassing governance.
+- [x] **Phase 1: Canonical Tenant Resolution** - Normalize tenant identity across UI, API, Slack, and webhook channels with fail-closed behavior.
+- [x] **Phase 2: Org Authorization and Governance Safety** - Enforce least-privilege access and policy-driven approval controls with audited overrides.
+- [x] **Phase 3: Idempotent Lifecycle Transitions** - Make request creation, approvals, and fulfillment transitions retry-safe and deterministic.
+- [x] **Phase 4: Distributed Runtime Reliability** - Harden shared rate limiting and webhook delivery reliability for multi-instance deployments.
+- [x] **Phase 5: API and Agent Execution Guardrails** - Stabilize external contracts and secure agent/API action execution boundaries.
+- [x] **Phase 6: Audit and Operational Observability** - Deliver immutable evidence, exportability, and correlated diagnostics for operators.
+- [x] **Phase 7: Automation UX and AI-Triage Experience** - Improve request submission, triage guidance, and status clarity without bypassing governance.
 
 ## Phase Details
 
@@ -95,14 +95,38 @@
 **Plans**: TBD
 **UI hint**: yes
 
-## Progress Table
+## Progress Table — Milestone 1
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Canonical Tenant Resolution | 0/2 | Not started | - |
-| 2. Org Authorization and Governance Safety | 0/0 | Not started | - |
-| 3. Idempotent Lifecycle Transitions | 0/0 | Not started | - |
-| 4. Distributed Runtime Reliability | 0/0 | Not started | - |
-| 5. API and Agent Execution Guardrails | 0/0 | Not started | - |
-| 6. Audit and Operational Observability | 0/0 | Not started | - |
-| 7. Automation UX and AI-Triage Experience | 0/0 | Not started | - |
+| 1. Canonical Tenant Resolution | 2/2 | Complete | Done |
+| 2. Org Authorization and Governance Safety | 1/1 | Complete | Done |
+| 3. Idempotent Lifecycle Transitions | 1/1 | Complete | Done |
+| 4. Distributed Runtime Reliability | 1/1 | Complete | Done |
+| 5. API and Agent Execution Guardrails | 1/1 | Complete | Done |
+| 6. Audit and Operational Observability | 1/1 | Complete | Done |
+| 7. Automation UX and AI-Triage Experience | 1/1 | Complete | Done |
+
+---
+
+## Milestone 2: Production Readiness & Integration Depth
+
+- [x] **Phase 8: Real Connector Execution** - Replace stubs with GitHub and Google Workspace connectors; per-type connector routing.
+- [ ] **Phase 9: Time-Bound Access & Auto-Revocation** - Implement temporary access with automatic expiry and revocation.
+- [ ] **Phase 10: Slack Interactive Approvals** - Complete Slack Block Kit approve/deny from Slack.
+- [ ] **Phase 11: Linear-Grade UI Polish** - Typography, focus rings, navigation, density, dark/light parity.
+- [ ] **Phase 12: Access Review & Recertification** - Periodic access review campaigns with compliance export.
+- [ ] **Phase 13: Admin Analytics Expansion** - SLA tracking, connector health, AI accuracy metrics.
+- [ ] **Phase 14: Joiner/Mover/Leaver Lifecycle** - Starter bundles, role-change delta, offboarding revocation.
+
+## Progress Table — Milestone 2
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 8. Real Connector Execution | 1/1 | Complete | Done |
+| 9. Time-Bound Access & Auto-Revocation | 0/0 | Not started | - |
+| 10. Slack Interactive Approvals | 0/0 | Not started | - |
+| 11. Linear-Grade UI Polish | 0/0 | Not started | - |
+| 12. Access Review & Recertification | 0/0 | Not started | - |
+| 13. Admin Analytics Expansion | 0/0 | Not started | - |
+| 14. Joiner/Mover/Leaver Lifecycle | 0/0 | Not started | - |

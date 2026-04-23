@@ -14,6 +14,10 @@ export function requestStatusLabel(status: string): string {
       return "Done";
     case "failed":
       return "Could not complete";
+    case "manual_action_required":
+      return "Manual action needed";
+    case "provisioning":
+      return "Provisioning";
     default:
       return status.replace(/_/g, " ");
   }

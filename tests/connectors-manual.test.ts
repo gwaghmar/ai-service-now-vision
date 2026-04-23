@@ -36,9 +36,12 @@ describe("runManualProvisionFallback", () => {
     await runManualProvisionFallback({
       requestId: "req_123",
       requestTypeSlug: "github_access",
+      requestTypeTitle: "GitHub Access",
       organizationId: "org_1",
-      requesterId: "usr_1",
-      payload: {}
+      actorId: "usr_1",
+      payload: {},
+      requestStatus: "approved",
+      connectorId: "manual_ticketing",
     });
 
     // Check we updated fulfillmentJob

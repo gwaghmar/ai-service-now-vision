@@ -22,6 +22,8 @@ export async function createRequestCore(input: {
   auditAction: string;
   auditActorId: string | null;
   auditMetadata?: Record<string, unknown>;
+  idempotencyKey?: string | null;
+  expiresAt?: Date | null;
 }) {
   await evaluatePolicyOrThrow({
     organizationId: input.organizationId,
@@ -38,7 +40,7 @@ export async function createRequestCore(input: {
     approverIds.length > 0 ? approverIds : null;
 
   const id = randomUUID();
-  await db.insert(requestTable).values({
+  const insertValues = {
     id,
     organizationId: input.organizationId,
     requestTypeId: input.requestTypeId,
@@ -47,7 +49,32 @@ export async function createRequestCore(input: {
     status: "pending_approval",
     payload: input.payload,
     routingApproverIds: routingSnapshot,
-  });
+    idempotencyKey: input.idempotencyKey ?? null,
+    expiresAt: input.expiresAt ?? null,
+  };
+
+  try {
+    await db.insert(requestTable).values(insertValues);
+  } catch (err: any) {
+    if (err.code === "23505" && input.idempotencyKey) {
+      // Unique constraint violation (RLY-01)
+      const [existing] = await db
+        .select({ id: requestTable.id })
+        .from(requestTable)
+        .where(
+          and(
+            eq(requestTable.organizationId, input.organizationId),
+            eq(requestTable.idempotencyKey, input.idempotencyKey)
+          )
+        )
+        .limit(1);
+      
+      if (existing) {
+        return { id: existing.id };
+      }
+    }
+    throw err;
+  }
 
   await recordAuditEvent({
     organizationId: input.organizationId,

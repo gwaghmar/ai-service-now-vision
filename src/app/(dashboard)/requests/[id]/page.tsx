@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { and, asc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
@@ -11,6 +11,7 @@ import {
 } from "@/db/schema";
 import { requireSession } from "@/lib/session";
 import { requestStatusLabel } from "@/lib/status-labels";
+import { nextActionGuidance } from "@/lib/next-action";
 import { isApproverAllowedForRequest } from "@/server/approval-routing";
 import { RequestVisitTracker } from "@/components/request-visit-tracker";
 import { ApproverSummaryPanel } from "@/components/approver-summary-panel";
@@ -88,6 +89,24 @@ export default async function RequestDetailPage({
   const canResubmitInfo =
     isRequester && row.request.status === "needs_info";
 
+  // Resolve assigned approver email for guidance banner
+  let assignedApproverEmail: string | null = null;
+  if (row.request.assignedApproverId) {
+    const [approverRow] = await db
+      .select({ email: user.email })
+      .from(user)
+      .where(eq(user.id, row.request.assignedApproverId))
+      .limit(1);
+    assignedApproverEmail = approverRow?.email ?? null;
+  }
+
+  const guidance = nextActionGuidance({
+    status: row.request.status,
+    isRequester,
+    isApprover: canApprove,
+    approverEmail: assignedApproverEmail,
+  });
+
   const events = await db
     .select()
     .from(auditEvent)
@@ -119,6 +138,23 @@ export default async function RequestDetailPage({
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">Request</h1>
         <p className="mt-1 font-mono text-xs text-zinc-500">{id}</p>
       </div>
+
+      {guidance && (
+        <div
+          className={`rounded-xl border px-4 py-3 text-sm ${
+            guidance.tone === "action"
+              ? "border-cyan-200 bg-cyan-50/80 text-cyan-900 dark:border-cyan-900/50 dark:bg-cyan-950/30 dark:text-cyan-100"
+              : guidance.tone === "warn"
+                ? "border-amber-200 bg-amber-50/80 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100"
+                : guidance.tone === "done"
+                  ? "border-emerald-200 bg-emerald-50/80 text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-100"
+                  : "border-zinc-200 bg-zinc-50/80 text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900/50 dark:text-zinc-300"
+          }`}
+        >
+          <p className="font-semibold">{guidance.label}</p>
+          <p className="mt-0.5 text-[13px] opacity-90">{guidance.detail}</p>
+        </div>
+      )}
 
       <section className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
         <div className="flex flex-wrap items-center gap-2">

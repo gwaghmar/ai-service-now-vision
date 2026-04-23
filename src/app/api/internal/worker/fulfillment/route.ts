@@ -29,10 +29,19 @@ export async function POST(req: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const [fulfillmentResult, webhookResult] = await Promise.allSettled([
+  const [fulfillmentResult, webhookResult, revScanResult, notifyResult] = await Promise.allSettled([
     processStaleFulfillmentJobs(100),
     drainWebhookRetries(50),
+    (async () => {
+      const { scanAndEnqueueRevocations } = await import("@/server/revocation");
+      return scanAndEnqueueRevocations();
+    })(),
+    (async () => {
+      const { scanAndNotifyExpiring } = await import("@/server/revocation");
+      return scanAndNotifyExpiring();
+    })(),
   ]);
+
 
   // Purge nonces older than TTL (consumed or not — email links expire naturally)
   const nonceCutoff = new Date(Date.now() - NONCE_TTL_MS);
@@ -57,10 +66,22 @@ export async function POST(req: Request) {
       ? webhookResult.value
       : { delivered: 0, failed: 0, errors: 1 };
 
+  const revocations =
+    revScanResult.status === "fulfilled"
+      ? revScanResult.value
+      : { enqueued: 0, error: 1 };
+
+  const notifications =
+    notifyResult.status === "fulfilled"
+      ? notifyResult.value
+      : { notified: 0, error: 1 };
+
   return Response.json({
     ok: true,
     fulfillment,
     webhooks,
+    revocations,
+    notifications,
     noncesDeleted,
   });
 }

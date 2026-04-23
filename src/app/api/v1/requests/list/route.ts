@@ -1,4 +1,4 @@
-import { and, count, desc, eq, isNull } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { request as requestTable, requestType } from "@/db/schema";
@@ -29,6 +29,32 @@ export async function GET(req: Request) {
   // Build filters
   const conditions = [eq(requestTable.organizationId, ctx.organizationId)];
   if (status) conditions.push(eq(requestTable.status, status));
+
+  if (ctx.allowedTypeSlugs) {
+    if (requestTypeSlug && !ctx.allowedTypeSlugs.includes(requestTypeSlug)) {
+      return Response.json({ data: [], total: 0, page, pageSize });
+    }
+    
+    if (!requestTypeSlug && ctx.allowedTypeSlugs.length > 0) {
+      const allowedReqTypes = await db
+        .select({ id: requestType.id })
+        .from(requestType)
+        .where(
+          and(
+            eq(requestType.organizationId, ctx.organizationId),
+            inArray(requestType.slug, ctx.allowedTypeSlugs)
+          )
+        );
+      const allowedIds = allowedReqTypes.map(t => t.id);
+      if (allowedIds.length === 0) {
+        return Response.json({ data: [], total: 0, page, pageSize });
+      }
+      conditions.push(inArray(requestTable.requestTypeId, allowedIds));
+    } else if (!requestTypeSlug && ctx.allowedTypeSlugs.length === 0) {
+       return Response.json({ data: [], total: 0, page, pageSize });
+    }
+  }
+
   if (requestTypeSlug) {
     const [rt] = await db
       .select({ id: requestType.id })

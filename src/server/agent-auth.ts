@@ -16,5 +16,9 @@ export async function resolveAgentApiKey(authHeader: string | null) {
   if (!row || row.revokedAt) return null;
   if (hashApiKey(parsed.token) !== row.keyHash) return null;
 
-  return { organizationId: row.organizationId, apiKeyId: row.id };
+  return {
+    organizationId: row.organizationId,
+    apiKeyId: row.id,
+    allowedTypeSlugs: row.allowedTypeSlugs,
+  };
 }

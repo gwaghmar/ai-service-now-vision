@@ -1,9 +1,9 @@
 import { randomUUID } from "crypto";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { fulfillmentJob, request as requestTable } from "@/db/schema";
 import { recordAuditEvent } from "@/server/audit";
-import { runProvisionWithConnector } from "@/server/fulfillment";
+import { runJobWithConnector } from "@/server/fulfillment";
 import { deliverOrgWebhook } from "@/server/webhooks";
 
 const OPEN_STATUSES = ["pending", "processing"] as const;
@@ -21,15 +21,18 @@ export async function enqueueFulfillmentJob(
     organizationId: string;
     requestId: string;
     actorId: string | null;
+    jobType?: "provision" | "revoke";
   },
   executor: DbExecutor = db,
 ): Promise<string> {
+  const jobType = input.jobType ?? "provision";
   const [open] = await executor
     .select({ id: fulfillmentJob.id })
     .from(fulfillmentJob)
     .where(
       and(
         eq(fulfillmentJob.requestId, input.requestId),
+        eq(fulfillmentJob.jobType, jobType),
         inArray(fulfillmentJob.status, [...OPEN_STATUSES]),
       ),
     )
@@ -43,6 +46,7 @@ export async function enqueueFulfillmentJob(
     organizationId: input.organizationId,
     requestId: input.requestId,
     actorId: input.actorId,
+    jobType,
     status: "pending",
     attempts: 0,
     maxAttempts: 3,
@@ -78,48 +82,61 @@ export async function processFulfillmentJobById(jobId: string): Promise<void> {
       updatedAt: new Date(),
     })
     .where(and(eq(fulfillmentJob.id, jobId), eq(fulfillmentJob.status, job.status)))
-    .returning({ id: fulfillmentJob.id });
+    .returning();
 
   if (claimed.length === 0) return;
 
+  await executeProvisioning(claimed[0]);
+}
+
+/** The actual provisioning/revocation and terminal-state updates for a claimed job */
+async function executeProvisioning(job: typeof fulfillmentJob.$inferSelect): Promise<void> {
+  const type = (job.jobType as "provision" | "revoke") || "provision";
   try {
-    await runProvisionWithConnector({
+    const { runJobWithConnector } = await import("@/server/fulfillment");
+    await runJobWithConnector({
       requestId: job.requestId,
       organizationId: job.organizationId,
       actorId: job.actorId,
-    });
+    }, type);
+
     await db
       .update(fulfillmentJob)
       .set({ status: "succeeded", updatedAt: new Date(), lastError: null })
-      .where(eq(fulfillmentJob.id, jobId));
+      .where(eq(fulfillmentJob.id, job.id));
   } catch (err) {
     const message =
-      err instanceof Error ? err.message : "Unknown provision error";
+      err instanceof Error ? err.message : "Unknown fulfillment error";
 
-    const exhausted = nextAttempts >= job.maxAttempts;
+    const exhausted = job.attempts >= job.maxAttempts;
     const nextStatus = exhausted ? "failed" : "pending";
 
     if (exhausted) {
-      await db
-        .update(requestTable)
-        .set({ status: "failed", updatedAt: new Date() })
-        .where(eq(requestTable.id, job.requestId));
+      // If provision failed, mark request failed. If revoke failed, maybe keep same status or mark failed_revocation?
+      // For now, if provision fails we mark failed. If revoke fails, we can add a new status or just keep it as is.
+      if (type === "provision") {
+        await db
+          .update(requestTable)
+          .set({ status: "failed", updatedAt: new Date() })
+          .where(eq(requestTable.id, job.requestId));
+      }
 
       await recordAuditEvent({
         organizationId: job.organizationId,
         actorId: null,
         entityType: "request",
         entityId: job.requestId,
-        action: "provision_failed",
+        action: type === "provision" ? "provision_failed" : "revocation_failed",
         metadata: { error: message.slice(0, 500) },
       });
 
       void deliverOrgWebhook({
         organizationId: job.organizationId,
-        event: "provision.failed",
+        event: type === "provision" ? "provision.failed" : "provision.revocation_failed",
         data: { requestId: job.requestId, error: message.slice(0, 500) },
       });
     }
+
 
     await db
       .update(fulfillmentJob)
@@ -128,7 +145,7 @@ export async function processFulfillmentJobById(jobId: string): Promise<void> {
         lastError: message.slice(0, 2000),
         updatedAt: new Date(),
       })
-      .where(eq(fulfillmentJob.id, jobId));
+      .where(eq(fulfillmentJob.id, job.id));
 
     if (exhausted) {
       throw err;
@@ -136,31 +153,53 @@ export async function processFulfillmentJobById(jobId: string): Promise<void> {
   }
 }
 
-/** Drain pending jobs (cron / worker). Logs per-job errors; counts only. */
+/** Drain pending jobs (cron / worker). Uses database locking for safe concurrent fetching. */
 export async function processStaleFulfillmentJobs(limit: number): Promise<{
   processed: number;
   errors: number;
 }> {
-  const candidates = await db
-    .select({ id: fulfillmentJob.id })
-    .from(fulfillmentJob)
-    .where(
-      and(
-        inArray(fulfillmentJob.status, ["pending", "failed", "processing"]),
-      ),
-    )
-    .orderBy(asc(fulfillmentJob.createdAt))
-    .limit(limit);
+  const staleCutoff = new Date(Date.now() - PROCESSING_STALE_AFTER_MS);
+
+  // RLY-04: distributed locks guarantee concurrent workers don't steal same subsets
+  const claimed = await db.transaction(async (tx) => {
+    const candidates = await tx
+      .select({ id: fulfillmentJob.id })
+      .from(fulfillmentJob)
+      .where(
+        or(
+          inArray(fulfillmentJob.status, ["pending", "failed"]),
+          and(eq(fulfillmentJob.status, "processing"), lte(fulfillmentJob.updatedAt, staleCutoff))
+        )
+      )
+      .orderBy(asc(fulfillmentJob.createdAt))
+      .limit(limit)
+      .for("update", { skipLocked: true });
+
+    if (candidates.length === 0) return [];
+
+    const ids = candidates.map(c => c.id);
+
+    return tx.update(fulfillmentJob)
+      .set({
+        status: "processing",
+        attempts: sql`${fulfillmentJob.attempts} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(inArray(fulfillmentJob.id, ids))
+      .returning();
+  });
 
   let errors = 0;
   let processed = 0;
-  for (const row of candidates) {
+  
+  for (const job of claimed) {
     try {
-      await processFulfillmentJobById(row.id);
+      await executeProvisioning(job);
       processed++;
     } catch {
       errors++;
     }
   }
+  
   return { processed, errors };
 }

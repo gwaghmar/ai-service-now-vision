@@ -58,9 +58,11 @@ async function rateLimitRedis(
     const ttl = await redis.ttl(key);
     await redis.quit();
     return { ok: false, retryAfterMs: Math.max(1, ttl) * 1000 };
-  } catch {
-    // If Redis is unavailable, fall through to in-memory
-    return rateLimitInMemory(key, limit, windowMs);
+  } catch (err) {
+    // RLY-04: If Redis is configured but unavailable, fail strictly closed
+    // rather than bypassing multi-instance limits silently via in-memory array.
+    console.error("[RateLimit] Redis unavailable:", err);
+    throw new Error("Distributed rate limiter is unavailable. Safely failing closed.");
   }
 }
 

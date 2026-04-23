@@ -1,3 +1,6 @@
+import { randomUUID } from "crypto";
+import { db } from "@/db";
+import { policyDecisionLog } from "@/db/schema";
 import { PolicyDeniedError } from "@/lib/errors";
 
 type PolicyInput = {
@@ -49,7 +52,19 @@ export async function evaluatePolicyOrThrow(input: PolicyInput) {
     const json = (await res.json()) as {
       decision?: string;
       reason?: string;
+      version?: string;
     };
+    
+    // Log the policy decision
+    await db.insert(policyDecisionLog).values({
+      id: randomUUID(),
+      organizationId: input.organizationId,
+      requestTypeSlug: input.requestTypeSlug,
+      decision: json.decision ?? "unknown",
+      reason: json.reason ?? null,
+      policyVersion: json.version ?? null,
+    });
+
     if (json.decision === "deny") {
       throw new PolicyDeniedError(json.reason);
     }

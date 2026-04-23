@@ -23,14 +23,13 @@ progress:
 
 ## Current Position
 
-Phase: 01 (canonical-tenant-resolution) — EXECUTING
-Plan: 1 of 2
+Phase: 09 (time-bound-access-auto-revocation) — PENDING
 
-- **Current phase**: Phase 2 (pending)
-- **Current plan**: 2 plans ready (`01-PLAN-01`, `01-PLAN-02`)
-- **Overall status**: Ready to execute Phase 1
-- **Progress**: 0/7 phases complete (0%)
-- **Progress bar**: [-------] 0%
+- **Current phase**: Phase 9 (M2: Time-Bound Access & Auto-Revocation)
+- **Current plan**: Needs planning
+- **Overall status**: Ready to execute Phase 9
+- **Progress**: 8/14 phases complete (57%)
+- **Progress bar**: [XXXX---] 57%
 
 ## Performance Metrics
 
@@ -50,7 +49,7 @@ Plan: 1 of 2
 
 ### Active Todos
 
-- Execute Phase 1 (`/gsd-execute-phase 1`) — plans in `.planning/phases/01-canonical-tenant-resolution/`.
+- Execute Phase 9: Time-Bound Access & Auto-Revocation
 - Confirm implementation boundaries for tenant resolution contract across all channels.
 - Define acceptance test coverage expectations before first execution wave.
 
@@ -61,5 +60,5 @@ Plan: 1 of 2
 ## Session Continuity
 
 - **Last major artifact**: Phase 1 plans (`01-PLAN-01.md`, `01-PLAN-02.md`) on 2026-04-14
-- **Next command**: `/gsd-execute-phase 1`
-- **Resume guidance**: Run Plan 01 first (schema push needs dev `DATABASE_URL`); then Plan 02 (Slack + ingest + admin).
+- **Next command**: Execute Phase 9
+- **Resume guidance**: Phase 8 delivered real GitHub + Google Workspace connectors with per-type routing. Continue to Phase 9 for time-bound access.

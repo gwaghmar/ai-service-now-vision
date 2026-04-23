@@ -100,6 +100,16 @@ export async function POST(req: Request) {
     );
   }
 
+  if (ctx.allowedTypeSlugs && !ctx.allowedTypeSlugs.includes(type.slug)) {
+    return Response.json(
+      {
+        error: "Your API key is not authorized to create this request type.",
+        code: "forbidden",
+      },
+      { status: 403 },
+    );
+  }
+
   const requester = await findUserByEmailInOrg(
     ctx.organizationId,
     parsed.data.requesterEmail,
@@ -139,6 +149,7 @@ export async function POST(req: Request) {
       auditAction: "request_created_agent_api",
       auditActorId: null,
       auditMetadata: { apiKeyId: ctx.apiKeyId },
+      idempotencyKey: req.headers.get("idempotency-key"),
     });
     id = res.id;
   } catch (e) {

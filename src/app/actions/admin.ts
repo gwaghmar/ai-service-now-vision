@@ -216,12 +216,29 @@ export async function adminDeleteRequestType(input: { id: string }) {
   return { ok: true as const };
 }
 
-export async function adminCreateApiKey(input: { name: string }) {
-  const parsed = z.object({ name: z.string().min(1).max(120) }).safeParse(input);
-  if (!parsed.success) throw new Error("Invalid name");
+export async function adminCreateApiKey(input: {
+  name: string;
+  allowedSlugs?: string | null;
+}) {
+  const parsed = z
+    .object({
+      name: z.string().min(1).max(120),
+      allowedSlugs: z.string().optional().nullable(),
+    })
+    .safeParse(input);
+  if (!parsed.success) throw new Error("Invalid input");
 
   const session = await requireSession();
   const orgId = requireAdminOrg(session);
+
+  let allowedTypeSlugs: string[] | null = null;
+  if (parsed.data.allowedSlugs?.trim()) {
+    allowedTypeSlugs = parsed.data.allowedSlugs
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (allowedTypeSlugs.length === 0) allowedTypeSlugs = null;
+  }
 
   const { fullKey, lookupId, keyHash } = generateApiKeyMaterial();
 
@@ -231,6 +248,7 @@ export async function adminCreateApiKey(input: { name: string }) {
     name: parsed.data.name,
     lookupId,
     keyHash,
+    allowedTypeSlugs,
   });
 
   revalidatePath("/admin/api-keys");

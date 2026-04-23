@@ -57,6 +57,8 @@ export function NewRequestForm({
   const [suggestPending, setSuggestPending] = useState(false);
   const [similarRequests, setSimilarRequests] = useState<SimilarRequest[]>([]);
   const [similarLoading, setSimilarLoading] = useState(false);
+  const [duration, setDuration] = useState<string>("permanent"); // hours or "permanent"
+
 
   const selected = types.find((t) => t.id === typeId) ?? types[0];
   const schema = useMemo((): FieldSchemaJson | null => {
@@ -114,12 +116,25 @@ export function NewRequestForm({
             e.preventDefault();
             setSubmitError(null);
             const payload: Record<string, unknown> = { ...fieldValues };
+            
+            let expiresAt: string | null = null;
+            if (duration !== "permanent") {
+              const hours = parseInt(duration, 10);
+              if (!isNaN(hours)) {
+                const date = new Date();
+                date.setHours(date.getHours() + hours);
+                expiresAt = date.toISOString();
+              }
+            }
+
             setPending(true);
             try {
               const res = await createRequestAction({
                 requestTypeId: typeId,
                 payload,
+                expiresAt,
               });
+
               if (!res.ok) {
                 setSubmitError(
                   "policyDenied" in res
@@ -251,6 +266,31 @@ export function NewRequestForm({
                 {suggestMsg ?? ""}
               </div>
             </div>
+
+            <div>
+              <label
+                htmlFor={`${formId}-duration`}
+                className="text-xs font-medium text-zinc-600 dark:text-zinc-400"
+              >
+                Access Duration
+              </label>
+              <select
+                id={`${formId}-duration`}
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
+              >
+                <option value="4">4 hours (Just-in-Time)</option>
+                <option value="24">24 hours (1 day)</option>
+                <option value="168">7 days (1 week)</option>
+                <option value="720">30 days (1 month)</option>
+                <option value="permanent">Permanent / Indefinite</option>
+              </select>
+              <p className="mt-1 text-xs text-zinc-500">
+                Access will be automatically revoked after this period.
+              </p>
+            </div>
+
 
             {schema.fields.map((f) => {
               const inputClass =

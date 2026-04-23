@@ -1,16 +1,21 @@
 import { createHmac, randomUUID } from "crypto";
-import { and, asc, eq, inArray, isNull, lte, or } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { organization, webhookDelivery } from "@/db/schema";
 import { decryptFieldIfNeeded } from "@/lib/field-encryption";
 import { assertSafeOutboundHttpUrl } from "@/lib/safe-url";
+import { recordAuditEvent } from "@/server/audit";
 
 export type GovernanceWebhookEvent =
   | "request.submitted"
   | "request.approved"
+  | "request.emergency_approved"
   | "provision.started"
   | "provision.succeeded"
-  | "provision.failed";
+  | "provision.failed"
+  | "provision.revocation_started"
+  | "provision.revocation_failed"
+  | "provision.revoked";
 
 /** Exponential back-off delays for retry attempts (ms). */
 const RETRY_DELAYS_MS = [0, 30_000, 300_000]; // immediate, 30 s, 5 min
@@ -106,10 +111,15 @@ export async function attemptWebhookDelivery(deliveryId: string): Promise<void> 
         inArray(webhookDelivery.status, ["pending", "failed"]),
       ),
     )
-    .returning({ id: webhookDelivery.id });
+    .returning();
 
   if (claimed.length === 0) return; // already being processed
 
+  await executeWebhookDelivery(claimed[0]);
+}
+
+/** Execute a claimed webhook row */
+async function executeWebhookDelivery(row: typeof webhookDelivery.$inferSelect): Promise<void> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "User-Agent": "ai-governance-webhook/1",
@@ -135,11 +145,11 @@ export async function attemptWebhookDelivery(deliveryId: string): Promise<void> 
     await db
       .update(webhookDelivery)
       .set({ status: "delivered", deliveredAt: new Date(), updatedAt: new Date() })
-      .where(eq(webhookDelivery.id, deliveryId));
+      .where(eq(webhookDelivery.id, row.id));
   } catch (e) {
     const message = e instanceof Error ? e.message : "Unknown error";
-    const exhausted = nextAttempts >= row.maxAttempts;
-    const delayMs = RETRY_DELAYS_MS[nextAttempts] ?? RETRY_DELAYS_MS[RETRY_DELAYS_MS.length - 1];
+    const exhausted = row.attempts >= row.maxAttempts;
+    const delayMs = RETRY_DELAYS_MS[row.attempts] ?? RETRY_DELAYS_MS[RETRY_DELAYS_MS.length - 1];
     const nextRetryAt = exhausted ? null : new Date(Date.now() + delayMs);
 
     await db
@@ -150,12 +160,12 @@ export async function attemptWebhookDelivery(deliveryId: string): Promise<void> 
         nextRetryAt,
         updatedAt: new Date(),
       })
-      .where(eq(webhookDelivery.id, deliveryId));
+      .where(eq(webhookDelivery.id, row.id));
 
     if (!exhausted) {
-      console.warn(`[webhook] delivery ${deliveryId} attempt ${nextAttempts} failed — will retry:`, message);
+      console.warn(`[webhook] delivery ${row.id} attempt ${row.attempts} failed — will retry:`, message);
     } else {
-      console.error(`[webhook] delivery ${deliveryId} exhausted after ${nextAttempts} attempts:`, message);
+      console.error(`[webhook] delivery ${row.id} exhausted after ${row.attempts} attempts:`, message);
     }
   } finally {
     clearTimeout(timeout);
@@ -164,7 +174,7 @@ export async function attemptWebhookDelivery(deliveryId: string): Promise<void> 
 
 /**
  * Cron drain: retry all pending/failed deliveries whose next_retry_at is due.
- * Called by the worker route.
+ * Uses database locking (SKIP LOCKED) for safe concurrent fetching.
  */
 export async function drainWebhookRetries(limit: number): Promise<{
   delivered: number;
@@ -172,33 +182,53 @@ export async function drainWebhookRetries(limit: number): Promise<{
   errors: number;
 }> {
   const now = new Date();
-  const candidates = await db
-    .select({ id: webhookDelivery.id })
-    .from(webhookDelivery)
-    .where(
-      and(
-        inArray(webhookDelivery.status, ["pending", "failed"]),
-        or(isNull(webhookDelivery.nextRetryAt), lte(webhookDelivery.nextRetryAt, now)),
-      ),
-    )
-    .orderBy(asc(webhookDelivery.createdAt))
-    .limit(limit);
+
+  // RLY-04: distributed locks guarantee concurrent workers don't steal same subsets
+  const claimed = await db.transaction(async (tx) => {
+    const candidates = await tx
+      .select({ id: webhookDelivery.id })
+      .from(webhookDelivery)
+      .where(
+        and(
+          inArray(webhookDelivery.status, ["pending", "failed"]),
+          or(isNull(webhookDelivery.nextRetryAt), lte(webhookDelivery.nextRetryAt, now)),
+        ),
+      )
+      .orderBy(asc(webhookDelivery.createdAt))
+      .limit(limit)
+      .for("update", { skipLocked: true });
+
+    if (candidates.length === 0) return [];
+
+    const ids = candidates.map(c => c.id);
+
+    return tx.update(webhookDelivery)
+      .set({
+        status: "delivering",
+        attempts: sql`${webhookDelivery.attempts} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(inArray(webhookDelivery.id, ids))
+      .returning();
+  });
 
   let delivered = 0;
   let failed = 0;
   let errors = 0;
 
-  for (const { id } of candidates) {
+  for (const row of claimed) {
     try {
-      await attemptWebhookDelivery(id);
+      await executeWebhookDelivery(row);
+      
       // Re-read final status
-      const [row] = await db
+      const [finalRow] = await db
         .select({ status: webhookDelivery.status })
         .from(webhookDelivery)
-        .where(eq(webhookDelivery.id, id))
+        .where(eq(webhookDelivery.id, row.id))
         .limit(1);
-      if (row?.status === "delivered") delivered++;
-      else if (row?.status === "failed") failed++;
+        
+      if (finalRow?.status === "delivered") delivered++;
+      else if (finalRow?.status === "failed") failed++;
     } catch {
       errors++;
     }

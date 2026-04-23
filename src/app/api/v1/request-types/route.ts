@@ -26,5 +26,9 @@ export async function GET(req: Request) {
       ),
     );
 
-  return Response.json(types);
+  const filteredTypes = ctx.allowedTypeSlugs
+    ? types.filter((t) => ctx.allowedTypeSlugs!.includes(t.slug))
+    : types;
+
+  return Response.json(filteredTypes);
 }

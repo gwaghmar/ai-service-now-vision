@@ -7,6 +7,7 @@ import {
   index,
   uniqueIndex,
   integer,
+  boolean,
 } from "drizzle-orm/pg-core";
 import { user } from "./auth-schema";
 
@@ -55,6 +56,8 @@ export const apiKey = pgTable(
       .defaultNow()
       .notNull(),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    /** Optional explicit allowlist of request type slugs this token can trigger */
+    allowedTypeSlugs: jsonb("allowed_type_slugs").$type<string[] | null>(),
   },
   (t) => [index("api_key_org_idx").on(t.organizationId)],
 );
@@ -72,6 +75,8 @@ export const requestType = pgTable(
     fieldSchema: jsonb("field_schema").notNull().$type<unknown>(),
     riskDefaults: jsonb("risk_defaults").notNull().$type<unknown>(),
     appCatalogId: text("app_catalog_id"), // Reference to the app_catalog, added via relations below
+    /** Optional per-type connector override (github, google_workspace, http_webhook, manual_ticketing, etc.). Falls back to global PROVISION_CONNECTOR env when null. */
+    connectorId: text("connector_id"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -112,6 +117,16 @@ export const request = pgTable(
     /** One-sentence reason from the triage model. */
     aiTriageReason: text("ai_triage_reason"),
     aiTriageAt: timestamp("ai_triage_at", { withTimezone: true }),
+    
+    /** RLY-01: Retry-safe creation key */
+    idempotencyKey: text("idempotency_key"),
+    
+    /** JIT and Emergency Override primitives */
+    isEmergencyOverride: boolean("is_emergency_override").default(false).notNull(),
+    overrideReason: text("override_reason"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    /** Track if the 2-hour pre-expiry notification was successfully dispatched. */
+    preExpiryNotifiedAt: timestamp("pre_expiry_notified_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -126,6 +141,9 @@ export const request = pgTable(
       t.assignedApproverId,
       t.status,
     ),
+    uniqueIndex("request_org_idempotency_key_idx")
+      .on(t.organizationId, t.idempotencyKey)
+      .where(sql`${t.idempotencyKey} is not null`),
   ],
 );
 
@@ -210,6 +228,8 @@ export const fulfillmentJob = pgTable(
     actorId: text("actor_id").references(() => user.id, {
       onDelete: "set null",
     }),
+    /** provision | revoke */
+    jobType: text("job_type").notNull().default("provision"),
     status: text("status").notNull(),
     attempts: integer("attempts").notNull().default(0),
     maxAttempts: integer("max_attempts").notNull().default(3),
@@ -226,7 +246,7 @@ export const fulfillmentJob = pgTable(
     index("fulfillment_job_org_status_idx").on(t.organizationId, t.status),
     index("fulfillment_job_request_idx").on(t.requestId),
     uniqueIndex("fulfillment_job_request_open_unique")
-      .on(t.requestId)
+      .on(t.requestId, t.jobType)
       .where(sql`${t.status} in ('pending', 'processing')`),
   ],
 );
@@ -571,6 +591,7 @@ export const organizationRelations = relations(organization, ({ many, one }) => 
   emailSettings: one(organizationEmailSettings),
   appCatalogs: many(appCatalog),
   oktaGroupMappings: many(oktaGroupMapping),
+  policyDecisionLogs: many(policyDecisionLog),
 }));
 
 export const changeTemplateRelations = relations(
@@ -646,6 +667,7 @@ export const requestRelations = relations(request, ({ one, many }) => ({
   }),
   approvals: many(approval),
   fulfillmentJobs: many(fulfillmentJob),
+  policyDecisionLogs: many(policyDecisionLog),
 }));
 
 export const fulfillmentJobRelations = relations(fulfillmentJob, ({ one }) => ({
@@ -681,6 +703,39 @@ export const auditEventRelations = relations(auditEvent, ({ one }) => ({
   }),
   actor: one(user, {
     fields: [auditEvent.actorId],
+    references: [user.id],
+  }),
+}));
+
+/** Stores individual policy engine evaluation logs for GOV-04 compliance. */
+export const policyDecisionLog = pgTable("policy_decision_log", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  requestId: text("request_id")
+    .references(() => request.id, { onDelete: "set null" }),
+  requestTypeSlug: text("request_type_slug").notNull(),
+  decision: text("decision").notNull(),
+  reason: text("reason"),
+  policyVersion: text("policy_version"),
+  actorId: text("actor_id").references(() => user.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export const policyDecisionLogRelations = relations(policyDecisionLog, ({ one }) => ({
+  organization: one(organization, {
+    fields: [policyDecisionLog.organizationId],
+    references: [organization.id],
+  }),
+  request: one(request, {
+    fields: [policyDecisionLog.requestId],
+    references: [request.id],
+  }),
+  actor: one(user, {
+    fields: [policyDecisionLog.actorId],
     references: [user.id],
   }),
 }));

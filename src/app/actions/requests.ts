@@ -15,11 +15,12 @@ import { requireSession } from "@/lib/session";
 import { recordAuditEvent } from "@/server/audit";
 import { queryAuditExportRows } from "@/server/audit-export";
 import { createRequestCore } from "@/server/create-request";
-import { applyRequestDecision } from "@/server/request-decision";
+import { applyRequestDecision, applyEmergencyOverride } from "@/server/request-decision";
 
 const createRequestInputSchema = z.object({
   requestTypeId: z.uuid(),
   payload: z.record(z.string(), z.unknown()),
+  expiresAt: z.string().datetime().optional().nullable(),
 });
 
 const decideApprovalInputSchema = z.object({
@@ -43,12 +44,16 @@ function userRole(session: { user: { role?: string | null } }) {
 export async function createRequestAction(input: {
   requestTypeId: string;
   payload: Record<string, unknown>;
+  expiresAt?: string | null;
 }) {
   const boundary = createRequestInputSchema.safeParse(input);
   if (!boundary.success) {
     throw new Error("Invalid request data");
   }
-  const { requestTypeId, payload } = boundary.data;
+  const { requestTypeId, payload, expiresAt } = boundary.data;
+
+  const expiresAtDate = expiresAt ? new Date(expiresAt) : null;
+
 
   const session = await requireSession();
   const orgId = sessionOrgId(session);
@@ -81,6 +86,7 @@ export async function createRequestAction(input: {
       requesterId,
       requestTypeId: type.id,
       payload: parsed.data as Record<string, unknown>,
+      expiresAt: expiresAtDate,
       typeSlug: type.slug,
       typeTitle: type.title,
       typeRiskDefaults: type.riskDefaults,
@@ -239,4 +245,55 @@ export async function fetchAuditExportRows(input: {
   }
   const orgId = sessionOrgId(session);
   return queryAuditExportRows({ orgId, from: input.from, to: input.to });
+}
+
+const emergencyOverrideInputSchema = z.object({
+  requestId: z.uuid(),
+  reason: z.string().min(5).max(1000),
+  durationDays: z.number().int().min(1).max(365).optional(),
+});
+
+/** Server action to break-glass override a stuck request. Strict admin-only. */
+export async function emergencyOverrideAction(input: {
+  requestId: string;
+  reason: string;
+  durationDays?: number;
+}) {
+  const boundary = emergencyOverrideInputSchema.safeParse(input);
+  if (!boundary.success) {
+    throw new Error("Invalid emergency override parameters.");
+  }
+  const { requestId, reason, durationDays } = boundary.data;
+
+  // TNTY-03: Strict least privilege check for admin status!
+  const session = await requireSession();
+  const role = userRole(session);
+  if (role !== "admin") {
+    throw new Error("Only an active organization admin can perform an emergency override.");
+  }
+
+  const orgId = sessionOrgId(session);
+  const adminId = session.user.id;
+
+  try {
+    await applyEmergencyOverride({
+      organizationId: orgId,
+      requestId,
+      adminUserId: adminId,
+      reason,
+      durationDays,
+    });
+  } catch (err) {
+    revalidatePath("/");
+    revalidatePath("/approvals");
+    revalidatePath("/requests");
+    revalidatePath(`/requests/${requestId}`);
+    throw err instanceof Error ? err : new Error(String(err));
+  }
+
+  revalidatePath("/");
+  revalidatePath("/approvals");
+  revalidatePath("/requests");
+  revalidatePath(`/requests/${requestId}`);
+  return { ok: true as const };
 }
